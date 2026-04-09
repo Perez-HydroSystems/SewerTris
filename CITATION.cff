@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "SewerTris: Synthetic urban sanitary sewer system generator and SWMM benchmarking framework"
+type: software
+version: "1.0.0"
+date-released: 2026-02-18
+license: MIT
+repository-code: "https://github.com/KevinBlanco94/SewerTris_0.1"
+
+authors:
+  - family-names: Blanco
+    given-names: Kevin
+    affiliation: "School of Civil and Environmental Engineering, Oklahoma State University"
+  - family-names: Perez
+    given-names: Gabriel
+    affiliation: "School of Civil and Environmental Engineering, Oklahoma State University"
+    website: "https://experts.okstate.edu/gabriel.perez_mesa"
+
+keywords:
+  - sanitary sewer
+  - inflow and infiltration
+  - I&I
+  - SWMM
+  - PySWMM
+  - urban hydrology
+  - synthetic data
+  - procedural generation
+  - wastewater infrastructure
