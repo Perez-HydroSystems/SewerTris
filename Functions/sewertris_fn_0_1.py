@@ -4068,54 +4068,207 @@ def generate_random_rdii_density_raster(
 
 def auto_add_pollutants_to_inp_fixed(inp_path, output_path):
     """
-    Keeps [DWF] lines (including all patterns) and appends RAIN/DRY [POLLUTANTS]
-    and [REPORT] sections at the end.
+    Adds 3 tracer pollutants and ensures baseline FLOW inflows are tagged with TR_GWI
+    via a pollutant inflow using the correct SWMM keyword: CONCEN (not CONC).
+
+    Experiment meaning:
+      - TR_RUNOFF: tags subcatchment runoff (your "RDII") via Crain=100
+      - TR_DWF:    tags DWF via Cdwf=100
+      - TR_GWI:    tags baseline node FLOW inflows (your "GWI") by adding:
+                   Node TR_GWI "" CONCEN 1.0 1.0 100 [Pattern optional]
+
+    Protections:
+      - Preserves [DWF] lines (keeps all tokens/patterns).
+      - Removes existing [POLLUTANTS] and [REPORT] to avoid duplicates.
+      - Inserts [POLLUTANTS] BEFORE [INFLOWS] so pollutants exist when referenced.
+      - Inserts [REPORT] before [END].
+      - Adds TR_GWI only if missing for that node.
     """
-    with open(inp_path, 'r') as f:
+    import re
+
+    with open(inp_path, "r") as f:
         lines = f.readlines()
 
-    in_dwf = False
-    cleaned_lines = []
+    def is_header(s: str) -> bool:
+        s = s.strip()
+        return s.startswith("[") and s.endswith("]")
 
-    # Step 1: Preserve DWF section (no pattern truncation)
+    def drop_sections(lines_in, drop_upper):
+        out = []
+        in_drop = False
+        for line in lines_in:
+            s = line.strip()
+            if is_header(s):
+                in_drop = (s.upper() in drop_upper)
+                if in_drop:
+                    continue
+                out.append(line)
+                continue
+            if in_drop:
+                continue
+            out.append(line)
+        return out
+
+    # Remove existing [POLLUTANTS] and [REPORT] to avoid duplicates
+    lines = drop_sections(lines, {"[POLLUTANTS]", "[REPORT]"})
+
+    # Preserve [DWF] (keep all tokens/patterns)
+    cleaned = []
+    in_dwf = False
     for line in lines:
         stripped = line.strip()
-        if stripped.upper().startswith("[DWF]"):
+        upper = stripped.upper()
+
+        if upper.startswith("[DWF]"):
             in_dwf = True
-            cleaned_lines.append(line)
+            cleaned.append(line)
             continue
-        elif stripped.startswith("[") and not stripped.upper().startswith("[DWF]"):
+        elif stripped.startswith("[") and not upper.startswith("[DWF]"):
             in_dwf = False
-            cleaned_lines.append(line)
+            cleaned.append(line)
             continue
 
         if in_dwf and stripped and not stripped.startswith(";"):
-            # Normalize whitespace but keep ALL tokens (node, constituent, baseline, patterns...)
-            parts = stripped.split()
-            cleaned_lines.append("    ".join(parts) + "\n")
+            if ";" in line:
+                body, comment = line.split(";", 1)
+                parts = body.strip().split()
+                cleaned.append("    ".join(parts) + "    ;" + comment)
+            else:
+                parts = stripped.split()
+                cleaned.append("    ".join(parts) + "\n")
         else:
-            cleaned_lines.append(line)
+            cleaned.append(line)
 
-    # Step 2: Append pollutant and report sections
-    cleaned_lines.append("""
-[POLLUTANTS]
-;;Name           Units  Crain      Cgw        Crdii      Kdecay     SnowOnly   Co-Pollutant     Co-Frac    Cdwf       Cinit     
-;;-------------- ------ ---------- ---------- ---------- ---------- ---------- ---------------- ---------- ----------
-RAIN             MG/L   100        0.0        0.0        0.0        NO         *                0.0        0.0        0.0       
-DRY              MG/L   0.0        0.0        0.0        0.0        NO         *                0.0        100        0.0       
+    # Pollutants block (must appear BEFORE INFLOWS if INFLOWS references TR_GWI)
+    pollutants_block = """[POLLUTANTS]
+;;Name        Units  Crain  Cgw   Crdii  Kdecay  SnowOnly  Co-Pollutant  Co-Frac  Cdwf  Cinit
+;;----------  -----  -----  ----  -----  ------  --------  ------------  -------  ----  -----
+TR_RUNOFF     MG/L   100    0.0   0.0    0.0     NO        *             0.0      0.0   0.0
+TR_DWF        MG/L   0.0    0.0   0.0    0.0     NO        *             0.0      100   0.0
+TR_GWI        MG/L   0.0    0.0   0.0    0.0     NO        *             0.0      0.0   0.0
+"""
 
-[REPORT]
+    report_block = """[REPORT]
 ;;Reporting Options
 SUBCATCHMENTS ALL
 NODES ALL
 LINKS ALL
-""")
+"""
 
-    # Step 3: Write output
-    with open(output_path, 'w') as f:
-        f.writelines(cleaned_lines)
+    def parse_inflows_row(line: str):
+        s = line.strip()
+        if not s or s.startswith(";") or s.startswith("["):
+            return None
 
-    print(f"✅ Kept [DWF] patterns and appended [POLLUTANTS] and [REPORT] to {output_path}")
+        body = line.split(";", 1)[0].strip()
+        parts = re.split(r"\s+", body)
+
+        # Accept both:
+        # 7 tokens: node constituent timeseries type mfactor sfactor baseline
+        # 8 tokens: ... + pattern
+        if len(parts) < 7:
+            return None
+
+        node, constituent, typ_series, inflow_type, mf, sf, baseline = parts[:7]
+        pattern = parts[7] if len(parts) >= 8 else ""
+        return dict(
+            node=node,
+            constituent=constituent,
+            timeseries=typ_series,
+            inflow_type=inflow_type,
+            mf=mf,
+            sf=sf,
+            baseline=baseline,
+            pattern=pattern,
+        )
+
+    def format_inflows_row(node, constituent, timeseries, inflow_type, mf, sf, baseline, pattern=""):
+        if pattern:
+            return f"{node:<18}{constituent:<16}{timeseries:<16}{inflow_type:<8}{mf:<8}{sf:<8}{baseline:<8}{pattern}\n"
+        return f"{node:<18}{constituent:<16}{timeseries:<16}{inflow_type:<8}{mf:<8}{sf:<8}{baseline}\n"
+
+    out = []
+    in_inflows = False
+    inflows_block = []
+    pollutants_inserted = False
+    report_inserted = False
+
+    def flush_inflows(block_lines):
+        tagged_nodes = set()
+
+        parsed = []
+        for ln in block_lines:
+            row = parse_inflows_row(ln)
+            parsed.append((ln, row))
+            if row is None:
+                continue
+            if row["constituent"].upper() == "TR_GWI" and row["inflow_type"].upper() in {"CONCEN", "MASS"}:
+                tagged_nodes.add(row["node"])
+
+        rebuilt = []
+        for raw, row in parsed:
+            rebuilt.append(raw)
+            if row is None:
+                continue
+
+            # For each baseline FLOW inflow, add TR_GWI as CONCEN if missing
+            if row["constituent"].upper() == "FLOW" and row["inflow_type"].upper() == "FLOW":
+                node = row["node"]
+                if node not in tagged_nodes:
+                    rebuilt.append(format_inflows_row(
+                        node=node,
+                        constituent="TR_GWI",
+                        timeseries=row["timeseries"],     # keep "" like your FLOW line
+                        inflow_type="CONCEN",              # ✅ correct SWMM keyword
+                        mf=row["mf"],
+                        sf=row["sf"],
+                        baseline="100",
+                        pattern=row["pattern"]
+                    ))
+                    tagged_nodes.add(node)
+
+        return rebuilt
+
+    for line in cleaned:
+        s = line.strip()
+
+        # Insert pollutants BEFORE first INFLOWS header
+        if (not pollutants_inserted) and s.upper().startswith("[INFLOWS]"):
+            out.append("\n" + pollutants_block + "\n")
+            pollutants_inserted = True
+
+        if s.upper().startswith("[INFLOWS]"):
+            in_inflows = True
+            inflows_block = [line]
+            continue
+
+        if in_inflows:
+            if is_header(s) and not s.upper().startswith("[INFLOWS]"):
+                out.extend(flush_inflows(inflows_block))
+                in_inflows = False
+                out.append(line)
+            else:
+                inflows_block.append(line)
+        else:
+            # Insert report before [END]
+            if (not report_inserted) and s.upper().startswith("[END]"):
+                out.append("\n" + report_block + "\n")
+                report_inserted = True
+            out.append(line)
+
+    if in_inflows:
+        out.extend(flush_inflows(inflows_block))
+
+    # Fallbacks
+    if not pollutants_inserted:
+        out.append("\n" + pollutants_block + "\n")
+    if not report_inserted:
+        out.append("\n" + report_block + "\n")
+
+    with open(output_path, "w") as f:
+        f.writelines(out)
+
+    print(f"✅ Tagged inp written (uses CONCEN) -> {output_path}")
 
 
 def download_noaa_coop_15min_range(state_abbr, start_year, end_year, output_folder="noaa_15min_data"):

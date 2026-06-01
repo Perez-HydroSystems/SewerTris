@@ -786,16 +786,22 @@ def add_subcatchment_data_with_rdii_raster(
 
 def get_flow_components_from_node_pyswmm(inp_path, link_id="P_OUTLET", node_id="OUTLET"):
     """
-    Tracer-based hydrograph separation at a location in the network.
+    Tracer-assisted hydrograph separation at a location in the network.
 
-    Components:
-      - RDII_runoff: subcatchment runoff contribution (your experiment), tagged by TR_RUNOFF (Crain=100)
-      - DWF:         dry-weather flow, tagged by TR_DWF (Cdwf=100)
-      - GWI:         baseline external inflow contribution, tagged by TR_GWI injected as CONCEN=100 in [INFLOWS]
-      - Residual:    should be ~0 if all 3 sources are fully tagged
+    Logic:
+      - DWF is estimated using TR_DWF
+      - GWI is estimated using TR_GWI
+      - RDII_runoff is computed as:
 
-    NOTE: Flow is in SWMM project units.
+            RDII_runoff = Total flow - DWF - GWI
+
+    This avoids relying on TR_RUNOFF being exactly 100%.
+
+    NOTE:
+    Flow is in SWMM project units.
+    Pollutant concentrations are assumed to use 100 mg/L source tagging.
     """
+
     from pyswmm import Simulation, Links, Nodes
     import pandas as pd
 
@@ -803,11 +809,14 @@ def get_flow_components_from_node_pyswmm(inp_path, link_id="P_OUTLET", node_id="
     tr_runoff, tr_dwf, tr_gwi = [], [], []
 
     with Simulation(inp_path) as sim:
+
         link = Links(sim)[link_id]
         node = Nodes(sim)[node_id]
 
         for _ in sim:
+
             times.append(sim.current_time)
+
             q = float(link.flow)
             flows.append(q)
 
@@ -818,23 +827,67 @@ def get_flow_components_from_node_pyswmm(inp_path, link_id="P_OUTLET", node_id="
     df = pd.DataFrame({
         "Datetime": times,
         "Flow_model_units": flows,
-        "TR_RUNOFF_mgL": tr_runoff,
-        "TR_DWF_mgL": tr_dwf,
-        "TR_GWI_mgL": tr_gwi,
+        "TR_RUNOFF": tr_runoff,
+        "TR_DWF": tr_dwf,
+        "TR_GWI": tr_gwi,
     })
 
-    # Clip to reduce numerical noise
-    df["TR_RUNOFF_mgL"] = df["TR_RUNOFF_mgL"].clip(0.0, 100.0)
-    df["TR_DWF_mgL"]    = df["TR_DWF_mgL"].clip(0.0, 100.0)
-    df["TR_GWI_mgL"]    = df["TR_GWI_mgL"].clip(0.0, 100.0)
+    # Clip concentrations to reduce numerical noise
+    df["TR_RUNOFF"] = df["TR_RUNOFF"].clip(0.0, 100.0)
+    df["TR_DWF"]    = df["TR_DWF"].clip(0.0, 100.0)
+    df["TR_GWI"]    = df["TR_GWI"].clip(0.0, 100.0)
 
-    df["RDII_runoff"] = df["Flow_model_units"] * (df["TR_RUNOFF_mgL"] / 100.0)
-    df["DWF"]         = df["Flow_model_units"] * (df["TR_DWF_mgL"] / 100.0)
-    df["GWI"]         = df["Flow_model_units"] * (df["TR_GWI_mgL"] / 100.0)
+    # Components estimated from reliable tracers
+    df["DWF"] = df["Flow_model_units"] * df["TR_DWF"] / 100.0
+    df["GWI"] = df["Flow_model_units"] * df["TR_GWI"] / 100.0
 
-    df["Residual"] = df["Flow_model_units"] - (df["RDII_runoff"] + df["DWF"] + df["GWI"])
+    # RDII as remaining wet-weather flow
+    df["RDII_runoff"] = (
+        df["Flow_model_units"]
+        - df["DWF"]
+        - df["GWI"]
+    )
 
-    return df[["Datetime", "Flow_model_units", "RDII_runoff", "DWF", "GWI", "Residual"]]
+    # Avoid tiny negative values from numerical noise
+    df["RDII_runoff"] = df["RDII_runoff"].clip(lower=0.0)
+
+    # Diagnostic only: RDII estimated directly from TR_RUNOFF
+    df["RDII_from_TR_RUNOFF"] = (
+        df["Flow_model_units"] * df["TR_RUNOFF"] / 100.0
+    )
+
+    # Diagnostic closure
+    df["Residual"] = (
+        df["Flow_model_units"]
+        - (
+            df["RDII_runoff"]
+            + df["DWF"]
+            + df["GWI"]
+        )
+    )
+
+    return df[
+        [
+            "Datetime",
+            "Flow_model_units",
+
+            # Raw tracer concentrations
+            "TR_RUNOFF",
+            "TR_DWF",
+            "TR_GWI",
+
+            # Main separated flows
+            "RDII_runoff",
+            "DWF",
+            "GWI",
+
+            # Diagnostic comparison
+            "RDII_from_TR_RUNOFF",
+
+            # Closure check
+            "Residual",
+        ]
+    ]
 
 def run_swmm_and_plot(inp_path, monitored_nodes=None, monitored_links=None):
     """
