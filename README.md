@@ -107,23 +107,17 @@ sewertris/
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/KevinBlanco94/SewerTris_0.1.git
+git clone https://github.com/Perez-HydroSystems/sewertris.git
 cd sewertris
 ```
 
 ### 2. Create a virtual environment
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate      # macOS/Linux
-# .venv\Scripts\activate       # Windows
+conda env create -f environment_sewertris.yml
+conda activate sewertris
 ```
 
-### 3. Install the package
-
-```bash
-pip install -e .
-```
 ---
 ## 🚀 Quick Start
 
@@ -196,7 +190,7 @@ If you use SewerTris in academic work, please cite:
 
 ```code
 Blanco, K., & Perez, G. (2026).  
-**SewerTris: Synthetic urban sanitary sewer system generator and SWMM benchmarking framework**  
+**SewerTris: Synthetic urban sanitary sewer system generator and EPA-SWMM benchmarking framework**  
 ```
 
 A DOI will be generated after the first GitHub release via Zenodo.

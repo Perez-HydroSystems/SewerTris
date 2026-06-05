@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sewertris"
+version = "0.1.0"
+description = "Synthetic urban sanitary sewer system generator and EPA-SWMM benchmarking framework."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [
+  { name = "Kevin Blanco" },
+  { name = "Gabriel Perez" }
+]
+dependencies = [
+  "geopandas",
+  "matplotlib",
+  "networkx",
+  "numpy",
+  "osmnx",
+  "pandas",
+  "pyproj",
+  "pyswmm",
+  "rasterio",
+  "rasterstats",
+  "scikit-image",
+  "scipy",
+  "shapely",
+  "xarray"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

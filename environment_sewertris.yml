@@ -1,0 +1,38 @@
+name: sewertris
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10.13
+  - pip
+
+  # Core scientific stack
+  - numpy
+  - pandas
+  - scipy
+  - xarray
+  - netcdf4
+  - scikit-image
+  - networkx
+
+  # Geospatial stack
+  - geopandas
+  - shapely
+  - rasterio
+  - pyproj
+  - osmnx
+  - rasterstats==0.20.0
+
+  # Plotting and notebooks
+  - matplotlib
+  - jupyterlab
+  - notebook
+  - ipykernel
+
+  # Development and smoke tests
+  - pytest
+
+  # SWMM Python interface
+  - pip:
+      - pyswmm==2.0.1
+      - swmm-toolkit==0.15.5

@@ -1,71 +1,9 @@
+"""SWMM model creation, inflow assignment, simulation, and output utilities."""
+
 from __future__ import annotations
-from collections import defaultdict
-from scipy.spatial import cKDTree
-from math import sqrt
 
-# =======================
-# Standard library
-# =======================
-import os
-import random
-import math
-from typing import Dict, List, Tuple
-from types import SimpleNamespace
+from ._deps import *
 
-# =======================
-# Scientific stack
-# =======================
-import numpy as np
-import pandas as pd
-import networkx as nx
-from scipy.interpolate import griddata
-from scipy.ndimage import gaussian_filter
-from skimage.measure import label
-
-# =======================
-# Plotting
-# =======================
-import matplotlib.pyplot as plt
-from matplotlib import cm, colors
-from matplotlib.colors import LightSource
-
-# =======================
-# Geospatial stack
-# =======================
-import geopandas as gpd
-import rasterio
-from rasterio.features import rasterize
-from rasterio.mask import mask
-from rasterio.transform import from_origin
-
-import osmnx as ox
-from pyproj import CRS, Transformer
-
-from shapely.errors import TopologicalError
-from shapely.geometry import (
-    Point,
-    LineString,
-    MultiLineString,
-    Polygon,
-    MultiPolygon,
-    box,
-)
-from shapely.ops import unary_union, linemerge
-from shapely.strtree import STRtree
-
-# Shapely version compatibility (make_valid exists in Shapely >= 2.0)
-try:
-    from shapely.validation import make_valid
-except Exception:
-    make_valid = None
-
-from shapely.geometry import LineString
-from shapely.strtree import STRtree
-from collections import defaultdict
-import networkx as nx
-import random
-
-# Function to download city boundary from OpenStreetMap
 def export_swmm_inp(pipes_path, manholes_path, output_path, title="Generated Sewer Network", options_dict=None):
     import geopandas as gpd
     import pandas as pd
@@ -85,7 +23,7 @@ def export_swmm_inp(pipes_path, manholes_path, output_path, title="Generated Sew
         return commercial_sizes_mm[-1] / 1000
 
     # Load data
-    pipes = gpd.read_file(pipes_path)
+    pipes = ensure_pipe_topology_aliases(gpd.read_file(pipes_path))
     manholes = gpd.read_file(manholes_path)
 
     # Diameter handling
@@ -110,7 +48,15 @@ def export_swmm_inp(pipes_path, manholes_path, output_path, title="Generated Sew
         raise ValueError("No outlet manhole found.")
     last_mh_id = outlet_candidates[0]
 
-    flow_col = next((col for col in ["flow_lps", "peak_flow_", "peakflow", "q_peak"] if col in pipes.columns), None)
+    flow_col = next((col for col in [
+        "flow_lps",
+        "peak_flow_lps_bc",
+        "peak_flow_",
+        "predesign_ls",
+        "predesign_",
+        "peakflow",
+        "q_peak",
+    ] if col in pipes.columns), None)
     if not flow_col:
         raise KeyError("Missing peak flow column.")
     peak_flow = pipes[pipes["downstream"] == last_mh_id][flow_col].sum()
@@ -145,12 +91,18 @@ def export_swmm_inp(pipes_path, manholes_path, output_path, title="Generated Sew
 
     inv_map = pipes.set_index("upstream_m")["inv_up"].to_dict()
     manholes["invert_elev"] = manholes["id"].map(inv_map)
-    manholes["invert_elev"].fillna(manholes["elevation"] - 1.0, inplace=True)
+    manholes["invert_elev"] = manholes["invert_elev"].fillna(manholes["elevation"] - 1.0)
     manholes["max_depth"] = (manholes["elevation"] - manholes["invert_elev"]).clip(lower=1.0)
 
-    if "own_flow_l" not in pipes.columns:
-        raise KeyError("Missing 'own_flow_l'.")
-    dwf_data = pipes.groupby("upstream_m")["own_flow_l"].sum().reset_index()
+    own_flow_col = next((col for col in [
+        "own_flow_lps",
+        "own_flow_l",
+        "flow_lps",
+        "base_flow_lps",
+    ] if col in pipes.columns), None)
+    if own_flow_col is None:
+        raise KeyError("Missing own-flow column. Tried: own_flow_lps, own_flow_l, flow_lps, base_flow_lps.")
+    dwf_data = pipes.groupby("upstream_m")[own_flow_col].sum().reset_index()
     dwf_data.columns = ["node", "flow_lps"]
     dwf_data = dwf_data[dwf_data["node"].isin(manholes["id"])]
 
@@ -272,7 +224,6 @@ def export_swmm_inp(pipes_path, manholes_path, output_path, title="Generated Sew
 
     print(f"✅ SWMM .inp file written to: {output_path}")
 
-
 def assign_dwf_pattern_to_all_nodes(inp_path, output_path, pattern_id, pattern_values):
     """
     Assigns a repeating HOURLY pattern to all nodes in the [DWF] section
@@ -356,7 +307,6 @@ def assign_dwf_pattern_to_all_nodes(inp_path, output_path, pattern_id, pattern_v
 
     print(f"✅ Pattern '{pattern_id}' correctly assigned and formatted. Output saved to: {output_path}")
 
-
 def assign_inflow_from_pipe_length(inp_path, output_path, coefficient):
     """
     Assigns inflow baseline values to nodes in a SWMM .inp file based on
@@ -422,7 +372,6 @@ def assign_inflow_from_pipe_length(inp_path, output_path, coefficient):
         f.writelines(new_lines)
 
     print(f"✅ INFLOWS section created using coefficient {coefficient:.4f}. File saved to: {output_path}")
-
 
 def add_subcatchment_data_to_inp(
     inp_path,
@@ -540,7 +489,6 @@ def add_subcatchment_data_to_inp(
 
     print(f"✅ SWMM .inp file updated with subcatchments and saved to: {output_path}")
 
-
 def assign_inflow_from_raster(inp_path, output_path, raster_path, samples_per_pipe=5):
     import rasterio
     import numpy as np
@@ -644,7 +592,6 @@ def assign_inflow_from_raster(inp_path, output_path, raster_path, samples_per_pi
         f.writelines(new_lines)
 
     print(f"✅ INFLOWS assigned based on raster and pipe length. Output: {output_path}")
-
 
 def add_subcatchment_data_with_rdii_raster(
     inp_path,
@@ -783,7 +730,6 @@ def add_subcatchment_data_with_rdii_raster(
 
     print(f"✅ SWMM .inp file updated with RDII-based impervious percentages and saved to: {output_path}")
 
-
 def get_flow_components_from_node_pyswmm(inp_path, link_id="P_OUTLET", node_id="OUTLET"):
     """
     Tracer-assisted hydrograph separation at a location in the network.
@@ -804,6 +750,8 @@ def get_flow_components_from_node_pyswmm(inp_path, link_id="P_OUTLET", node_id="
 
     from pyswmm import Simulation, Links, Nodes
     import pandas as pd
+
+    inp_path = os.fspath(inp_path)
 
     times, flows = [], []
     tr_runoff, tr_dwf, tr_gwi = [], [], []
@@ -902,6 +850,8 @@ def run_swmm_and_plot(inp_path, monitored_nodes=None, monitored_links=None):
     from pyswmm import Simulation, Nodes, Links
     import pandas as pd
 
+    inp_path = os.fspath(inp_path)
+
     if monitored_nodes is None:
         monitored_nodes = []
     if monitored_links is None:
@@ -947,7 +897,7 @@ def run_swmm_and_plot(inp_path, monitored_nodes=None, monitored_links=None):
         plt.tight_layout()
         plt.show()
 
-    return df_depths, df_flows    
+    return df_depths, df_flows
 
 def auto_add_pollutants_to_inp_fixed(inp_path, output_path):
     """
@@ -1152,3 +1102,15 @@ LINKS ALL
         f.writelines(out)
 
     print(f"✅ Tagged inp written (uses CONCEN) -> {output_path}")
+
+__all__ = [
+    "export_swmm_inp",
+    "assign_dwf_pattern_to_all_nodes",
+    "assign_inflow_from_pipe_length",
+    "add_subcatchment_data_to_inp",
+    "assign_inflow_from_raster",
+    "add_subcatchment_data_with_rdii_raster",
+    "get_flow_components_from_node_pyswmm",
+    "run_swmm_and_plot",
+    "auto_add_pollutants_to_inp_fixed",
+]

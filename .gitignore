@@ -1,0 +1,31 @@
+# OS metadata
+.DS_Store
+
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.sewertris_cache/
+
+# Jupyter local state
+.ipynb_checkpoints/
+
+# Build/package artifacts
+build/
+dist/
+*.egg-info/
+
+# SewerTris example and simulation outputs
+examples/output*/
+examples/runs/
+examples/sibling_type_examples/
+Examples/output*/
+Examples/runs/
+Examples/sibling_type_examples/
+output_example*/
+output_sewertris*/
+
+# Common generated SWMM/result artifacts when written outside output folders
+sewer_model.out
+sewer_model.rpt
+flows.nc
