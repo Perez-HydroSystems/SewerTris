@@ -432,41 +432,210 @@ def generate_clustered_rainfall_timeseries(
     output = list(df[['date', 'time', 'rain_mm']].itertuples(index=False, name=None))
     return output
 
-def plot_flow_components_v2(df, start=None, end=None, title="Flow Components at P_OUTLET"):
+def plot_flow_components_v2(
+    df,
+    rain=None,
+    start=None,
+    end=None,
+    title="Flow Components at P_OUTLET",
+    flow_units="L/s",
+    stack_components=True,
+    flow_min=None,
+    flow_max=None,
+    rain_min=None,
+    rain_max=None,
+):
     """
-    Plots total flow and its components using actual column names: RDII_lps, DWF_lps, GWI_lps.
+    Plot synthetic flow components with optional rainfall.
 
-    Parameters:
-    - df: DataFrame with 'Datetime', 'Flow_lps', 'DWF_lps', 'RDII_lps', 'GWI_lps'
-    - start, end: Optional datetime strings or objects to filter time range
-    - title: Plot title
+    Expected df columns:
+        Datetime, DWF, GWI, RDII_runoff
+
+    Optional total column:
+        Flow_model_units
+
+    rain can be:
+        - list of tuples: [('1/1/2025', '00:00', 0.0), ...]
+        - pandas Series with DatetimeIndex
+        - DataFrame with DATE, TIME, QPCP
+        - DataFrame with DATETIME, QPCP
     """
 
-    import matplotlib.pyplot as plt
     import pandas as pd
+    import matplotlib.pyplot as plt
+    import matplotlib.dates as mdates
+    import numpy as np
 
-    if not pd.api.types.is_datetime64_any_dtype(df["Datetime"]):
-        df["Datetime"] = pd.to_datetime(df["Datetime"])
+    C_RAIN = "#001CBD"
+    C_GWI  = "#FEB24C"
+    C_BWF  = "#D95F0E"
+    C_RDII = "#3182BD"
+    C_TOTAL = "#000000"
+
+    df = df.copy()
+
+    if "Datetime" not in df.columns:
+        raise ValueError("df must contain a 'Datetime' column.")
+
+    df["Datetime"] = pd.to_datetime(df["Datetime"])
+    df = df.sort_values("Datetime")
 
     if start:
         df = df[df["Datetime"] >= pd.to_datetime(start)]
     if end:
         df = df[df["Datetime"] <= pd.to_datetime(end)]
 
-    plt.figure(figsize=(12, 6))
-    plt.plot(df["Datetime"], df["Flow_model_units"], label="Total Flow", linewidth=2)
-    plt.plot(df["Datetime"], df["RDII_runoff"], label="RDII (Rainfall I&I)", linestyle='--')
-    plt.plot(df["Datetime"], df["DWF"], label="Dry Weather Flow", linestyle='-.')
-    plt.plot(df["Datetime"], df["GWI"], label="GWI (Groundwater Infiltration)", linestyle=':')
+    required = ["DWF", "GWI", "RDII_runoff"]
+    missing = [c for c in required if c not in df.columns]
+    if missing:
+        raise ValueError(f"Missing required columns: {missing}")
 
-    plt.xlabel("Time")
-    plt.ylabel("Flow [l/s]")
-    plt.title(title)
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
+    if "Flow_model_units" in df.columns:
+        total = df["Flow_model_units"]
+    else:
+        total = df["DWF"] + df["GWI"] + df["RDII_runoff"]
+
+    fig, ax = plt.subplots(figsize=(12, 6), dpi=300)
+
+    if stack_components:
+        ax.stackplot(
+            df["Datetime"],
+            df["GWI"],
+            df["DWF"],
+            df["RDII_runoff"],
+            colors=[C_GWI, C_BWF, C_RDII],
+            alpha=0.5,
+            labels=["GWI", "BWF", "RDII"]
+        )
+    else:
+        ax.plot(df["Datetime"], df["GWI"], color=C_GWI, label="GWI", linestyle=":")
+        ax.plot(df["Datetime"], df["DWF"], color=C_BWF, label="BWF", linestyle="-.")
+        ax.plot(df["Datetime"], df["RDII_runoff"], color=C_RDII, label="RDII", linestyle="--")
+
+    ax.plot(
+        df["Datetime"],
+        total,
+        color=C_TOTAL,
+        linewidth=2.2,
+        label="Total Flow"
+    )
+
+    ax.set_xlabel("Date / Time")
+    ax.set_ylabel(f"Flow ({flow_units})")
+    if flow_min is not None or flow_max is not None:
+        ax.set_ylim(
+            bottom=flow_min,
+            top=flow_max
+        )
+    ax.set_title(title)
+    ax.grid(True, alpha=0.3)
+
+    if rain is not None:
+
+        if isinstance(rain, pd.Series):
+            rain_s = rain.copy()
+            rain_s.index = pd.to_datetime(rain_s.index)
+
+        elif isinstance(rain, list):
+            rain_df = pd.DataFrame(
+                rain,
+                columns=["DATE", "TIME", "QPCP"]
+            )
+
+            rain_df["DATETIME"] = pd.to_datetime(
+                rain_df["DATE"].astype(str) + " " + rain_df["TIME"].astype(str),
+                format="%m/%d/%Y %H:%M",
+                errors="coerce"
+            )
+
+            rain_s = pd.Series(
+                rain_df["QPCP"].values,
+                index=rain_df["DATETIME"],
+                name="Rainfall"
+            )
+
+        else:
+            rain_df = rain.copy()
+
+            if "DATETIME" in rain_df.columns:
+                rain_df["DATETIME"] = pd.to_datetime(rain_df["DATETIME"])
+
+            elif {"DATE", "TIME"}.issubset(rain_df.columns):
+                rain_df["DATETIME"] = pd.to_datetime(
+                    rain_df["DATE"].astype(str) + " " + rain_df["TIME"].astype(str),
+                    format="%m/%d/%Y %H:%M",
+                    errors="coerce"
+                )
+
+            elif "DATE" in rain_df.columns:
+                rain_df["DATETIME"] = pd.to_datetime(
+                    rain_df["DATE"],
+                    format="%Y%m%d %H:%M",
+                    errors="coerce"
+                )
+
+            else:
+                raise ValueError("rain must have DATETIME, DATE/TIME, or DATE columns.")
+
+            rain_s = pd.Series(
+                rain_df["QPCP"].values,
+                index=rain_df["DATETIME"],
+                name="Rainfall"
+            )
+
+        rain_s = rain_s.dropna().sort_index()
+
+        if start:
+            rain_s = rain_s[rain_s.index >= pd.to_datetime(start)]
+        if end:
+            rain_s = rain_s[rain_s.index <= pd.to_datetime(end)]
+
+        ax_rain = ax.twinx()
+
+        if len(rain_s) > 1:
+            diffs = np.diff(rain_s.index.values).astype("timedelta64[s]").astype(float)
+            width_days = np.median(diffs) / 86400
+        else:
+            width_days = 1 / 24
+
+        ax_rain.bar(
+            rain_s.index,
+            rain_s.values,
+            width=width_days,
+            color=C_RAIN,
+            alpha=0.4,
+            edgecolor="none"
+        )
+
+        ax_rain.set_ylabel("Rainfall (mm/hr)", color=C_RAIN)
+        ax_rain.tick_params(axis="y", labelcolor=C_RAIN)
+
+        # Rainfall limits
+        if rain_min is not None or rain_max is not None:
+            ax_rain.set_ylim(
+                bottom=rain_min,
+                top=rain_max
+            )
+
+        # Keep rainfall inverted
+        ax_rain.invert_yaxis()
+
+    ax.xaxis.set_major_locator(mdates.AutoDateLocator())
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %d\n%H:%M"))
+
+    handles, labels = ax.get_legend_handles_labels()
+
+    if rain is not None:
+        handles.append(plt.Line2D([0], [0], color=C_RAIN, lw=6, alpha=0.4))
+        labels.append("Rainfall")
+
+    ax.legend(handles, labels, loc="upper right", frameon=True)
+
     plt.xticks(rotation=45)
+    plt.tight_layout()
     plt.show()
+
+    return fig, ax
 
 
 def _read_flow_components_table(source):
@@ -886,7 +1055,7 @@ def plot_ensemble_results(
     fig = plt.figure(figsize=figsize, constrained_layout=True)
     grid = fig.add_gridspec(3, 1, height_ratios=[1.0, 1.0, 1.55])
     hydro_grid = grid[:2, 0].subgridspec(2, 2)
-    summary_grid = grid[2, 0].subgridspec(2, 3, hspace=0.38, wspace=0.28)
+    summary_grid = grid[2, 0].subgridspec(2, 3, hspace=0.05, wspace=0.28)
     hydro_axes = [
         fig.add_subplot(hydro_grid[0, 0]),
         fig.add_subplot(hydro_grid[0, 1]),
@@ -949,6 +1118,13 @@ def plot_ensemble_results(
             color_by_group=color_by_group,
             ylabel=f"Peak Flow [{flow_unit_label}]",
         )
+
+    # Force horizontal x-axis labels on boxplots
+    for ax in volume_axes + peak_axes:
+        ax.tick_params(axis="x", labelrotation=0)
+        for label in ax.get_xticklabels():
+            label.set_ha("center")
+    
     volume_axes[0].text(
         -0.22,
         1.08,
@@ -1866,6 +2042,161 @@ def _plot_inflow_panel(ax, project, label, scenario_name=None, coefficient=0.000
     ax.axis("off")
     return sc
 
+def _coerce_rain_series(rain):
+    import pandas as pd
+
+    if rain is None:
+        return None
+
+    if isinstance(rain, pd.Series):
+        rain_s = rain.copy()
+        rain_s.index = pd.to_datetime(rain_s.index)
+        return rain_s.dropna().sort_index()
+
+    if isinstance(rain, list):
+        rain_df = pd.DataFrame(rain, columns=["DATE", "TIME", "QPCP"])
+        rain_df["DATETIME"] = pd.to_datetime(
+            rain_df["DATE"].astype(str) + " " + rain_df["TIME"].astype(str),
+            format="%m/%d/%Y %H:%M",
+            errors="coerce"
+        )
+        return pd.Series(
+            rain_df["QPCP"].values,
+            index=rain_df["DATETIME"],
+            name="Rainfall"
+        ).dropna().sort_index()
+
+    rain_df = rain.copy()
+
+    if "DATETIME" in rain_df.columns:
+        rain_df["DATETIME"] = pd.to_datetime(rain_df["DATETIME"])
+
+    elif {"DATE", "TIME"}.issubset(rain_df.columns):
+        rain_df["DATETIME"] = pd.to_datetime(
+            rain_df["DATE"].astype(str) + " " + rain_df["TIME"].astype(str),
+            format="%m/%d/%Y %H:%M",
+            errors="coerce"
+        )
+
+    elif "DATE" in rain_df.columns:
+        rain_df["DATETIME"] = pd.to_datetime(
+            rain_df["DATE"],
+            format="%Y%m%d %H:%M",
+            errors="coerce"
+        )
+
+    else:
+        raise ValueError("rain must have DATETIME, DATE/TIME, or DATE columns.")
+
+    return pd.Series(
+        rain_df["QPCP"].values,
+        index=rain_df["DATETIME"],
+        name="Rainfall"
+    ).dropna().sort_index()
+
+def _plot_flow_panel_with_rain(
+    ax,
+    df,
+    title,
+    rain=None,
+    start=None,
+    end=None,
+    flow_units="L/s",
+    stack_components=True,
+):
+    import numpy as np
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import matplotlib.dates as mdates
+
+    C_RAIN = "#001CBD"
+    C_GWI  = "#FEB24C"
+    C_BWF  = "#D95F0E"
+    C_RDII = "#3182BD"
+    C_TOTAL = "#000000"
+
+    df = df.copy()
+    df["Datetime"] = pd.to_datetime(df["Datetime"])
+    df = df.sort_values("Datetime")
+
+    if start:
+        df = df[df["Datetime"] >= pd.to_datetime(start)]
+    if end:
+        df = df[df["Datetime"] <= pd.to_datetime(end)]
+
+    required = ["DWF", "GWI", "RDII_runoff"]
+    missing = [c for c in required if c not in df.columns]
+
+    if missing:
+        raise ValueError(f"Missing required flow columns: {missing}")
+
+    if "Flow_model_units" in df.columns:
+        total = df["Flow_model_units"]
+    else:
+        total = df["DWF"] + df["GWI"] + df["RDII_runoff"]
+
+    if stack_components:
+        ax.stackplot(
+            df["Datetime"],
+            df["GWI"],
+            df["DWF"],
+            df["RDII_runoff"],
+            colors=[C_GWI, C_BWF, C_RDII],
+            alpha=0.5,
+            labels=["GWI", "BWF", "RDII"]
+        )
+    else:
+        ax.plot(df["Datetime"], df["GWI"], color=C_GWI, linestyle=":", label="GWI")
+        ax.plot(df["Datetime"], df["DWF"], color=C_BWF, linestyle="-.", label="BWF")
+        ax.plot(df["Datetime"], df["RDII_runoff"], color=C_RDII, linestyle="--", label="RDII")
+
+    ax.plot(
+        df["Datetime"],
+        total,
+        color=C_TOTAL,
+        linewidth=2.2,
+        label="Total Flow"
+    )
+
+    ax.set_title(title)
+    ax.set_xlabel("Date / Time")
+    ax.set_ylabel(f"Flow ({flow_units})")
+    ax.grid(True, alpha=0.3)
+
+    rain_s = _coerce_rain_series(rain)
+
+    if rain_s is not None:
+        if start:
+            rain_s = rain_s[rain_s.index >= pd.to_datetime(start)]
+        if end:
+            rain_s = rain_s[rain_s.index <= pd.to_datetime(end)]
+
+        ax_rain = ax.twinx()
+
+        if len(rain_s) > 1:
+            diffs = np.diff(rain_s.index.values).astype("timedelta64[s]").astype(float)
+            width_days = np.median(diffs) / 86400
+        else:
+            width_days = 1 / 24
+
+        ax_rain.bar(
+            rain_s.index,
+            rain_s.values,
+            width=width_days,
+            color=C_RAIN,
+            alpha=0.4,
+            edgecolor="none"
+        )
+
+        ax_rain.invert_yaxis()
+        ax_rain.set_ylabel("Rainfall (mm/hr)", color=C_RAIN)
+        ax_rain.tick_params(axis="y", labelcolor=C_RAIN)
+
+    ax.xaxis.set_major_locator(mdates.AutoDateLocator())
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %d\n%H:%M"))
+
+    return ax
+
 def plot_two_models(
     plot_type,
     project1,
@@ -2099,18 +2430,103 @@ def plot_two_models(
     elif plot_key == "flow_components":
         df1 = _read_project_flows(project1, scenario_name=scenario_name)
         df2 = _read_project_flows(project2, scenario_name=scenario_name)
-        _plot_flow_panel(axes[0], df1, left_label, start=start, end=end)
-        _plot_flow_panel(axes[1], df2, right_label, start=start, end=end)
-        ymin, ymax = [], []
-        for ax in axes:
-            low, high = ax.get_ylim()
-            ymin.append(low)
-            ymax.append(high)
-        for ax in axes:
-            ax.set_ylim(min(ymin), max(ymax))
+
+        rain = kwargs.get("rain", None)
+        rain1 = kwargs.get("rain1", rain)
+        rain2 = kwargs.get("rain2", rain)
+
+        flow_min = kwargs.get("flow_min", None)
+        flow_max = kwargs.get("flow_max", None)
+        rain_min = kwargs.get("rain_min", None)
+        rain_max = kwargs.get("rain_max", None)
+
+        _plot_flow_panel_with_rain(
+            axes[0],
+            df1,
+            left_label,
+            rain=rain1,
+            start=start,
+            end=end,
+            flow_units=kwargs.get("flow_units", "L/s"),
+            stack_components=kwargs.get("stack_components", True),
+        )
+
+        _plot_flow_panel_with_rain(
+            axes[1],
+            df2,
+            right_label,
+            rain=rain2,
+            start=start,
+            end=end,
+            flow_units=kwargs.get("flow_units", "L/s"),
+            stack_components=kwargs.get("stack_components", True),
+        )
+
+        # --------------------------------------------------
+        # Flow axis limits
+        # --------------------------------------------------
+        if flow_min is not None or flow_max is not None:
+            for ax in axes:
+                ax.set_ylim(bottom=flow_min, top=flow_max)
+        else:
+            ymin, ymax = [], []
+
+            for ax in axes:
+                low, high = ax.get_ylim()
+                ymin.append(low)
+                ymax.append(high)
+
+            for ax in axes:
+                ax.set_ylim(min(ymin), max(ymax))
+
+        # --------------------------------------------------
+        # Rainfall axis limits
+        # --------------------------------------------------
+        if rain1 is not None or rain2 is not None:
+            rain_axes = [ax for ax in fig.axes if ax not in axes]
+
+            if rain_min is not None or rain_max is not None:
+                for rain_ax in rain_axes:
+                    rain_ax.set_ylim(bottom=rain_min, top=rain_max)
+                    rain_ax.invert_yaxis()
+
+            # --------------------------------------------------
+            # Clean side-by-side axis layout:
+            # | Flow |        |        | Rain |
+            # --------------------------------------------------
+            if len(rain_axes) >= 2:
+
+                # LEFT subplot: keep flow axis, hide rainfall axis
+                rain_axes[0].set_ylabel("")
+                rain_axes[0].set_yticks([])
+                rain_axes[0].tick_params(right=False)
+                rain_axes[0].spines["right"].set_visible(False)
+
+                # RIGHT subplot: hide flow axis labels/ticks
+                axes[1].set_ylabel("")
+                axes[1].set_yticklabels([])
+                axes[1].tick_params(left=False)
+
+                # RIGHT subplot: keep rainfall axis
+                rain_axes[1].set_ylabel("Rainfall (mm/hr)", color="#001CBD")
+                rain_axes[1].tick_params(axis="y", labelcolor="#001CBD")
+
         handles, legend_labels = axes[1].get_legend_handles_labels()
-        fig.legend(handles, legend_labels, loc="lower center", ncol=4)
-        fig.subplots_adjust(bottom=0.2)
+
+        if rain1 is not None or rain2 is not None:
+            handles.append(
+                plt.Line2D([0], [0], color="#001CBD", lw=6, alpha=0.4)
+            )
+            legend_labels.append("Rainfall")
+
+        fig.legend(
+            handles,
+            legend_labels,
+            loc="lower center",
+            ncol=5
+        )
+
+        fig.subplots_adjust(bottom=0.22, wspace=0.08)
 
     elif plot_key == "inflow":
         coefficient = kwargs.get("coefficient", 0.0001)

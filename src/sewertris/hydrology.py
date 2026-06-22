@@ -486,92 +486,260 @@ def generate_random_inflow_raster(
     output_tif_path,
     min_value=0.001,
     max_value=0.010,
-    random_seed=None
+    random_seed=None,
+    n_hills=3,
+    hill_min_value=0.010,
+    hill_max_value=0.050,
+    hill_radius_min=20,
+    hill_radius_max=80,
+    clip_to_range=True,
 ):
+    """
+    Generate a random inflow raster with optional concentrated high-value areas
+    represented as smooth Gaussian hills.
+
+    Parameters
+    ----------
+    topo_tif_path : str
+        Reference raster used for shape, transform, CRS, and metadata.
+
+    output_tif_path : str
+        Output GeoTIFF path.
+
+    min_value, max_value : float
+        Background random inflow range.
+
+    random_seed : int or None
+        Seed for reproducibility.
+
+    n_hills : int
+        Number of concentrated high-value areas.
+
+    hill_min_value, hill_max_value : float
+        Range of peak additional inflow values added by each hill.
+
+    hill_radius_min, hill_radius_max : float
+        Minimum and maximum hill radius in pixels.
+
+    clip_to_range : bool
+        If True, final values are clipped to max_value + hill_max_value.
+    """
 
     import numpy as np
     import rasterio
-    from rasterio import Affine
-    from rasterio.enums import Resampling
-    import os    
-    
-    # Optional reproducibility
-    if random_seed is not None:
-        np.random.seed(random_seed)
 
-    # Load topography raster metadata
+    rng = np.random.default_rng(random_seed)
+
     with rasterio.open(topo_tif_path) as src:
-        profile = src.profile
+        profile = src.profile.copy()
         width = src.width
         height = src.height
-        transform = src.transform
-        crs = src.crs
-        dtype = np.float32  # output as float32
-    
-    # Generate random raster
-    inflow_array = np.random.uniform(low=min_value, high=max_value, size=(height, width)).astype(dtype)
+        nodata = src.nodata
 
-    # Update profile for output
+        topo = src.read(1)
+
+    dtype = np.float32
+
+    # --------------------------------------------------
+    # Background random inflow raster
+    # --------------------------------------------------
+    inflow_array = rng.uniform(
+        low=min_value,
+        high=max_value,
+        size=(height, width)
+    ).astype(dtype)
+
+    # --------------------------------------------------
+    # Create coordinate grid in pixel space
+    # --------------------------------------------------
+    yy, xx = np.indices((height, width))
+
+    # --------------------------------------------------
+    # Add Gaussian hills / hotspots
+    # --------------------------------------------------
+    for _ in range(n_hills):
+
+        center_x = rng.uniform(0, width)
+        center_y = rng.uniform(0, height)
+
+        peak_value = rng.uniform(hill_min_value, hill_max_value)
+        radius = rng.uniform(hill_radius_min, hill_radius_max)
+
+        hill = peak_value * np.exp(
+            -(
+                (xx - center_x) ** 2 +
+                (yy - center_y) ** 2
+            ) / (2 * radius ** 2)
+        )
+
+        inflow_array += hill.astype(dtype)
+
+    # --------------------------------------------------
+    # Optional clipping
+    # --------------------------------------------------
+    if clip_to_range:
+        inflow_array = np.clip(
+            inflow_array,
+            min_value,
+            max_value + hill_max_value
+        ).astype(dtype)
+
+    # --------------------------------------------------
+    # Preserve nodata areas from reference raster
+    # --------------------------------------------------
+    if nodata is not None:
+        mask = topo == nodata
+        inflow_array[mask] = nodata
+
+    # --------------------------------------------------
+    # Update output profile
+    # --------------------------------------------------
     profile.update(
         dtype=dtype,
         count=1,
-        compress='lzw'
+        compress="lzw"
     )
 
-    # Write the synthetic inflow raster
-    with rasterio.open(output_tif_path, 'w', **profile) as dst:
+    with rasterio.open(output_tif_path, "w", **profile) as dst:
         dst.write(inflow_array, 1)
 
-    print(f"Random inflow raster saved to: {output_tif_path}")
+    print(f"Random inflow raster with hills saved to: {output_tif_path}")
+
+    return inflow_array
 
 def generate_random_rdii_density_raster(
     topo_tif_path,
     output_tif_path,
-    min_density=0.1,       
+    min_density=0.1,
     max_density=3.0,
-    random_seed=None
+    random_seed=None,
+    n_hills=3,
+    hill_min_density=2.0,
+    hill_max_density=10.0,
+    hill_radius_min=20,
+    hill_radius_max=80,
+    clip_to_range=False,
 ):
     """
-    Generates a random RDII density raster aligned to a given topography raster.
+    Generate a synthetic RDII density raster with optional
+    concentrated infiltration/inflow hotspots represented as
+    Gaussian hills.
 
-    Parameters:
-    - topo_tif_path (str): Path to reference topography GeoTIFF.
-    - output_tif_path (str): Path to write the output RDII raster.
-    - min_density (float): Minimum RDII density value.
-    - max_density (float): Maximum RDII density value.
-    - random_seed (int, optional): For reproducible results.
+    Parameters
+    ----------
+    topo_tif_path : str
+        Reference raster.
+
+    output_tif_path : str
+        Output GeoTIFF.
+
+    min_density, max_density : float
+        Background RDII density range.
+
+    random_seed : int, optional
+        Seed for reproducibility.
+
+    n_hills : int
+        Number of RDII hotspots.
+
+    hill_min_density, hill_max_density : float
+        Peak density added by each hotspot.
+
+    hill_radius_min, hill_radius_max : float
+        Radius of hotspots in pixels.
+
+    clip_to_range : bool
+        If True, clip values to max_density.
+        Usually False for hotspot simulations.
     """
+
     import numpy as np
     import rasterio
-    import os
 
-    if random_seed is not None:
-        np.random.seed(random_seed)
+    rng = np.random.default_rng(random_seed)
 
-    # Load metadata from topography raster
     with rasterio.open(topo_tif_path) as src:
-        profile = src.profile
+        profile = src.profile.copy()
         width = src.width
         height = src.height
-        transform = src.transform
-        dtype = np.float32
-        crs = src.crs
+        nodata = src.nodata
 
-    # Generate random RDII density values
-    rdii_array = np.random.uniform(low=min_density, high=max_density, size=(height, width)).astype(dtype)
+        topo = src.read(1)
 
-    # Update profile
+    dtype = np.float32
+
+    # --------------------------------------------------
+    # Background RDII density
+    # --------------------------------------------------
+    rdii_array = rng.uniform(
+        min_density,
+        max_density,
+        size=(height, width)
+    ).astype(dtype)
+
+    # --------------------------------------------------
+    # Coordinate grid
+    # --------------------------------------------------
+    yy, xx = np.indices((height, width))
+
+    # --------------------------------------------------
+    # Add RDII hotspots
+    # --------------------------------------------------
+    for _ in range(n_hills):
+
+        center_x = rng.uniform(0, width)
+        center_y = rng.uniform(0, height)
+
+        peak_density = rng.uniform(
+            hill_min_density,
+            hill_max_density
+        )
+
+        radius = rng.uniform(
+            hill_radius_min,
+            hill_radius_max
+        )
+
+        hill = peak_density * np.exp(
+            -(
+                (xx - center_x) ** 2 +
+                (yy - center_y) ** 2
+            ) / (2 * radius ** 2)
+        )
+
+        rdii_array += hill.astype(dtype)
+
+    # --------------------------------------------------
+    # Optional clipping
+    # --------------------------------------------------
+    if clip_to_range:
+        rdii_array = np.clip(
+            rdii_array,
+            min_density,
+            max_density
+        )
+
+    # --------------------------------------------------
+    # Preserve nodata mask
+    # --------------------------------------------------
+    if nodata is not None:
+        rdii_array[topo == nodata] = nodata
+
+    # --------------------------------------------------
+    # Write output
+    # --------------------------------------------------
     profile.update(
         dtype=dtype,
         count=1,
-        compress='lzw'
+        compress="lzw"
     )
 
-    # Write output raster
-    with rasterio.open(output_tif_path, 'w', **profile) as dst:
-        dst.write(rdii_array, 1)
+    with rasterio.open(output_tif_path, "w", **profile) as dst:
+        dst.write(rdii_array.astype(dtype), 1)
 
     print(f"✅ RDII density raster saved to: {output_tif_path}")
+
+    return rdii_array
 
 def generate_clustered_rainfall_timeseries(
     start_date="2000-01-01 00:00",
@@ -703,6 +871,422 @@ def download_noaa_coop_15min_range(state_abbr, start_year, end_year, output_fold
         print("No valid data files were parsed.")
         return pd.DataFrame()
 
+def best_projected_crs(geom):
+    """Pick a UTM CRS based on geometry centroid."""
+    centroid = geom.centroid
+    lon = centroid.x
+    lat = centroid.y
+    zone = int((lon + 180) // 6) + 1
+    epsg = 32600 + zone if lat >= 0 else 32700 + zone
+    return f"EPSG:{epsg}"
+
+def create_vcp_density_raster(
+    pipes_path: str,
+    boundary_path: str,
+    out_raster: str,
+    resolution: float,
+    material_col: str = "MATERIAL",
+    target_value: str = "VCP",
+):
+    import math
+    import numpy as np
+    import geopandas as gpd
+    import rasterio
+    from rasterio.features import rasterize
+    from rasterio.transform import from_origin
+    from shapely.geometry import box
+    # 1. Load data
+    pipes = gpd.read_file(pipes_path)
+    boundary = gpd.read_file(boundary_path)
+
+    if boundary.empty:
+        raise ValueError("Boundary shapefile has no features.")
+    if pipes.crs is None or boundary.crs is None:
+        raise ValueError("One of the shapefiles has no CRS defined.")
+
+    # Single domain geometry
+    domain_geom = boundary.union_all()
+
+    # 2. Decide analysis CRS
+    if pipes.crs.is_geographic or boundary.crs.is_geographic:
+        if boundary.crs.is_geographic:
+            geom_for_utm = domain_geom
+        else:
+            geom_for_utm = boundary.to_crs(pipes.crs).union_all()
+        proj_crs = best_projected_crs(geom_for_utm)
+        print(f"✔ Using projected CRS (UTM) for analysis: {proj_crs}")
+    else:
+        proj_crs = boundary.crs
+        print(f"✔ Using existing projected CRS: {proj_crs}")
+
+    # 3. Reproject both layers to the analysis CRS
+    pipes = pipes.to_crs(proj_crs)
+    boundary = boundary.to_crs(proj_crs)
+    domain_geom = boundary.union_all()
+
+    # 4. Build raster grid from boundary extent
+    minx, miny, maxx, maxy = domain_geom.bounds
+    width = math.ceil((maxx - minx) / resolution)
+    height = math.ceil((maxy - miny) / resolution)
+
+    maxx = minx + width * resolution
+    maxy = miny + height * resolution
+
+    transform = from_origin(minx, maxy, resolution, resolution)
+
+    print("Boundary extent (projected):")
+    print(f"minx: {minx:.2f}, miny: {miny:.2f}, maxx: {maxx:.2f}, maxy: {maxy:.2f}")
+    print(f"Raster size (rows x cols): {height} x {width}")
+
+    # 5. Prepare pipe data
+    pipes[material_col] = pipes[material_col].astype(str)
+    pipes_vcp = pipes[pipes[material_col] == target_value]
+
+    print(f"Total pipes: {len(pipes)}")
+    print(f"VCP pipes: {len(pipes_vcp)}")
+    print(f"Non-VCP pipes: {len(pipes) - len(pipes_vcp)}")
+
+    # 6. Efficient spatial counting
+    print("Counting pipes per pixel...")
+
+    # Initialize arrays with zeros (important - this sets default to 0)
+    total_count = np.zeros((height, width), dtype=np.int32)
+    vcp_count = np.zeros((height, width), dtype=np.int32)
+
+    # Create VCP index set for fast lookup
+    vcp_indices = set(pipes_vcp.index)
+
+    # Count pipes per pixel using spatial intersection
+    for i in range(height):
+        for j in range(width):
+            # Get pixel bounds
+            x_min = transform[2] + j * transform[0]
+            y_max = transform[5] + i * transform[4]
+            x_max = x_min + resolution
+            y_min = y_max + resolution
+            
+            # Create pixel polygon
+            pixel_bbox = box(x_min, y_min, x_max, y_max)
+            
+            # Find pipes that intersect this pixel
+            intersecting_pipes = pipes[pipes.intersects(pixel_bbox)]
+            if len(intersecting_pipes) > 0:
+                total_count[i, j] = len(intersecting_pipes)
+                vcp_count[i, j] = len(intersecting_pipes[intersecting_pipes.index.isin(vcp_indices)])
+
+    # 7. Calculate density - KEY CHANGE: Initialize with zeros
+    density = np.zeros((height, width), dtype=np.float32)  # All pixels start at 0
+    
+    # Only calculate ratio where there are pipes
+    valid_pixels = total_count > 0
+    density[valid_pixels] = (vcp_count[valid_pixels] / total_count[valid_pixels]) * 100.0
+
+    print(f"\n=== FINAL DENSITY STATS ===")
+    print(f"Total pixels: {height * width}")
+    print(f"Pixels with pipes: {np.sum(valid_pixels)}")
+    print(f"Pixels without pipes (value = 0): {np.sum(~valid_pixels)}")
+    
+    if np.sum(valid_pixels) > 0:
+        unique_densities = np.unique(density[valid_pixels])
+        print(f"Unique density values: {unique_densities}")
+        print(f"Density range: {np.min(density[valid_pixels]):.1f}% to {np.max(density[valid_pixels]):.1f}%")
+        print(f"Mean density: {np.mean(density[valid_pixels]):.1f}%")
+        
+        # Show distribution of density values
+        for val in [0, 25, 50, 75, 100]:
+            count = np.sum(density == val)
+            if count > 0:
+                print(f"Pixels with {val}% density: {count}")
+
+    # 8. Apply boundary mask - set areas outside boundary to 0
+    boundary_mask = rasterize(
+        [(domain_geom, 1)],
+        out_shape=(height, width),
+        transform=transform,
+        fill=0,
+        all_touched=True,
+        dtype=np.uint8
+    )
+    density[boundary_mask == 0] = 0.0
+
+    # 9. Save WITHOUT NoData - KEY CHANGE: Remove nodata parameter
+    meta = {
+        "driver": "GTiff",
+        "height": height,
+        "width": width,
+        "count": 1,
+        "dtype": "float32",
+        "crs": proj_crs,
+        "transform": transform,
+        # No 'nodata' parameter - all values are valid (0 represents no pipes)
+    }
+
+    with rasterio.open(out_raster, "w", **meta) as dst:
+        dst.write(density, 1)
+
+    print(f"✔ Raster saved: {out_raster}")
+    print("✓ Pixels without pipes are set to 0 (not NoData)")
+    return density
+
+def create_building_density_raster(boundary_path, output_raster, resolution=100.0):
+    """
+    Create a building density raster (buildings per km²) from OpenStreetMap
+    data within the given boundary polygon.
+
+    Parameters
+    ----------
+    boundary_path : str
+        Path to boundary polygon shapefile.
+    output_raster : str
+        Path to output GeoTIFF.
+    resolution : float
+        Pixel size in meters.
+    """
+
+    import math
+    import numpy as np
+    import geopandas as gpd
+    import rasterio
+    from rasterio.transform import from_origin
+    from rasterio.features import rasterize
+    from shapely.geometry import box
+    import osmnx as ox
+
+    # 1. Load boundary (keep original CRS)
+    boundary = gpd.read_file(boundary_path)
+    print(f"Boundary CRS: {boundary.crs}")
+    print(f"Boundary bounds (original CRS): {boundary.total_bounds}")
+
+    if boundary.empty:
+        print("❌ Boundary file has no features.")
+        return None
+
+    # 2. Reproject boundary to WGS84 for OSM query
+    boundary_wgs84 = boundary.to_crs("EPSG:4326")
+    print(f"Boundary bounds (WGS84): {boundary_wgs84.total_bounds}")
+
+    # 3. Download buildings from OSM using polygon (NOT Edmond)
+    try:
+        boundary_poly_wgs84 = boundary_wgs84.unary_union
+        print("Querying OSM for buildings within boundary polygon...")
+        buildings = ox.features_from_polygon(
+            boundary_poly_wgs84,
+            tags={"building": True}
+        )
+        print(f"✅ Raw OSM features: {len(buildings)}")
+
+        if len(buildings) == 0:
+            print("❌ No building features returned by OSM for this area.")
+            return None
+
+        # Filter to valid building polygons
+        buildings = buildings[buildings.geometry.notna()]
+        valid_idx = []
+        for idx, geom in buildings.geometry.items():
+            if hasattr(geom, "geom_type") and geom.geom_type in ["Polygon", "MultiPolygon"]:
+                valid_idx.append(idx)
+
+        buildings = buildings.loc[valid_idx]
+        print(f"✅ Valid building polygons: {len(buildings)}")
+
+        if len(buildings) == 0:
+            print("❌ No valid Polygon/MultiPolygon building geometries.")
+            return None
+
+    except Exception as e:
+        print(f"❌ Error downloading OSM data: {e}")
+        return None
+
+    # 4. Choose an appropriate projected CRS (auto-estimate UTM from boundary)
+    try:
+        projected_crs = boundary.estimate_utm_crs()
+        print(f"Using estimated UTM CRS: {projected_crs}")
+    except Exception as e:
+        print(f"Warning estimating UTM CRS, falling back to EPSG:3857. Error: {e}")
+        projected_crs = "EPSG:3857"
+
+    buildings_proj = buildings.to_crs(projected_crs)
+    boundary_proj = boundary_wgs84.to_crs(projected_crs)
+
+    # 5. Compute raster grid in projected CRS
+    minx, miny, maxx, maxy = boundary_proj.total_bounds
+    width = math.ceil((maxx - minx) / resolution)
+    height = math.ceil((maxy - miny) / resolution)
+
+    print(f"Raster grid: width={width}, height={height}, resolution={resolution} m")
+
+    transform = from_origin(minx, maxy, resolution, resolution)
+
+    # 6. Count buildings per pixel
+    building_count = np.zeros((height, width), dtype=np.float32)
+    print("Calculating building count per pixel...")
+
+    # Optional: speed-up by spatial index
+    if hasattr(buildings_proj, "sindex"):
+        sindex = buildings_proj.sindex
+    else:
+        sindex = None
+
+    for i in range(height):
+        if i % 50 == 0:
+            print(f"  Processing row {i}/{height}")
+        for j in range(width):
+            x_min = transform[2] + j * transform[0]
+            y_max = transform[5] + i * transform[4]
+            x_max = x_min + resolution
+            y_min = y_max + resolution
+
+            pixel_bbox = box(x_min, y_min, x_max, y_max)
+
+            if sindex is not None:
+                possible_matches_index = list(sindex.intersection(pixel_bbox.bounds))
+                if not possible_matches_index:
+                    continue
+                subset = buildings_proj.iloc[possible_matches_index]
+                buildings_in_pixel = subset[subset.intersects(pixel_bbox)]
+            else:
+                buildings_in_pixel = buildings_proj[buildings_proj.intersects(pixel_bbox)]
+
+            building_count[i, j] = len(buildings_in_pixel)
+
+    # 7. Convert to density (buildings per square kilometer)
+    pixel_area_sq_m = resolution ** 2
+    pixel_area_sq_km = pixel_area_sq_m / 1_000_000.0
+    density = building_count / pixel_area_sq_km
+
+    # 8. Apply boundary mask so values outside are set to 0
+    boundary_geom_proj = boundary_proj.unary_union
+    boundary_mask = rasterize(
+        [(boundary_geom_proj, 1)],
+        out_shape=(height, width),
+        transform=transform,
+        fill=0,
+        all_touched=True,
+        dtype=np.uint8,
+    )
+    density[boundary_mask == 0] = 0.0
+
+    # 9. Save results as GeoTIFF
+    meta = {
+        "driver": "GTiff",
+        "height": height,
+        "width": width,
+        "count": 1,
+        "dtype": "float32",
+        "crs": projected_crs,
+        "transform": transform,
+    }
+
+    with rasterio.open(output_raster, "w", **meta) as dst:
+        dst.write(density, 1)
+
+    # 10. Print statistics
+    valid_pixels = density > 0
+    total_buildings = float(np.sum(building_count))
+
+    print(f"\n=== BUILDING DENSITY RESULTS ===")
+    print(f"Total buildings counted: {total_buildings}")
+    print(f"Pixels with buildings: {np.sum(valid_pixels)}")
+    if np.any(valid_pixels):
+        print(
+            f"Max density: {np.max(density[valid_pixels]):.1f} buildings/sq km"
+        )
+        print(
+            f"Mean density: {np.mean(density[valid_pixels]):.1f} buildings/sq km"
+        )
+    print(f"Raster saved: {output_raster}")
+
+    return density
+
+def adjust_raster_range(input_raster_path, output_raster_path, new_min, new_max, 
+                       original_min=None, original_max=None, nodata_value=None):
+    """
+    Adjust raster values to a new specified range using min-max normalization.
+    
+    Parameters:
+    -----------
+    input_raster_path : str
+        Path to input raster file (.tiff)
+    output_raster_path : str
+        Path for output raster file (.tiff)
+    new_min : float
+        Minimum value for the new range
+    new_max : float
+        Maximum value for the new range
+    original_min : float, optional
+        Original minimum value for scaling. If None, uses actual min from raster
+    original_max : float, optional
+        Original maximum value for scaling. If None, uses actual max from raster
+    nodata_value : float, optional
+        Nodata value to preserve in output
+    
+    Returns:
+    --------
+    dict : Information about the transformation
+    """
+
+    import rasterio
+    import numpy as np
+    
+    with rasterio.open(input_raster_path) as src:
+        # Read the raster data
+        raster_data = src.read()
+        profile = src.profile.copy()
+        
+        # Handle nodata values
+        if nodata_value is None:
+            nodata_value = src.nodata
+        
+        # Create mask for valid data (excluding nodata)
+        if nodata_value is not None:
+            valid_mask = raster_data != nodata_value
+        else:
+            valid_mask = np.ones_like(raster_data, dtype=bool)
+        
+        # Calculate original min/max if not provided
+        if original_min is None:
+            original_min = np.min(raster_data[valid_mask])
+        if original_max is None:
+            original_max = np.max(raster_data[valid_mask])
+        
+        print(f"Original range: {original_min} to {original_max}")
+        print(f"Target range: {new_min} to {new_max}")
+        
+        # Initialize output array
+        output_data = np.zeros_like(raster_data, dtype=np.float32)
+        
+        # Apply transformation only to valid data
+        for i in range(raster_data.shape[0]):  # For each band
+            band_data = raster_data[i]
+            band_mask = valid_mask[i] if valid_mask.ndim > 2 else valid_mask
+            
+            # Perform min-max normalization
+            output_data[i][band_mask] = ((band_data[band_mask] - original_min) / 
+                                       (original_max - original_min)) * (new_max - new_min) + new_min
+            
+            # Preserve nodata values
+            if nodata_value is not None:
+                output_data[i][~band_mask] = nodata_value
+        
+        # Update profile for output
+        profile.update({
+            'dtype': np.float32,
+            'nodata': nodata_value
+        })
+        
+        # Write output raster
+        with rasterio.open(output_raster_path, 'w', **profile) as dst:
+            dst.write(output_data)
+    
+    return {
+        'original_min': original_min,
+        'original_max': original_max,
+        'new_min': new_min,
+        'new_max': new_max,
+        'input_file': input_raster_path,
+        'output_file': output_raster_path
+    }
+
 __all__ = [
     "delineate_afferent_areas_and_baseflow",
     "assign_flow_to_pipes",
@@ -713,4 +1297,8 @@ __all__ = [
     "generate_random_rdii_density_raster",
     "generate_clustered_rainfall_timeseries",
     "download_noaa_coop_15min_range",
+    "best_projected_crs",
+    "create_vcp_density_raster",
+    "create_building_density_raster",
+    "adjust_raster_range"
 ]

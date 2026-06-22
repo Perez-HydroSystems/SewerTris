@@ -380,6 +380,7 @@ def add_subcatchment_data_to_inp(
     raingage_id,
     raingage_coords,
     timeseries,
+    interval,
     n_imperv,
     n_perv,
     s_imperv,
@@ -461,7 +462,7 @@ def add_subcatchment_data_to_inp(
         f.write("\n[RAINGAGES]\n")
         f.write(";;Name           Format    Interval SCF      Source    \n")
         f.write(";;-------------- --------- ------ ------ ----------\n")
-        f.write(f"{raingage_id:<16} {'INTENSITY':<10} {'0:15':<6} {'1.0':<6} TIMESERIES {raingage_id}\n")
+        f.write(f"{raingage_id:<16} {'INTENSITY':<10} {interval:<6} {'1.0':<6} TIMESERIES {raingage_id}\n")
 
         f.write("\n[SUBCATCHMENTS]\n")
         f.write(";;Name           Rain Gage        Outlet           Area     %Imperv  Width    %Slope   CurbLen  SnowPack        \n")
@@ -601,6 +602,7 @@ def add_subcatchment_data_with_rdii_raster(
     raingage_id,
     raingage_coords,
     timeseries,
+    interval,
     n_imperv,
     n_perv,
     s_imperv,
@@ -702,7 +704,7 @@ def add_subcatchment_data_with_rdii_raster(
         f.write("\n[RAINGAGES]\n")
         f.write(";;Name           Format    Interval SCF      Source    \n")
         f.write(";;-------------- --------- ------ ------ ----------\n")
-        f.write(f"{raingage_id:<16} {'INTENSITY':<10} {'0:15':<6} {'1.0':<6} TIMESERIES {raingage_id}\n")
+        f.write(f"{raingage_id:<16} {'INTENSITY':<10} {interval:<6} {'1.0':<6} TIMESERIES {raingage_id}\n")
 
         f.write("\n[SUBCATCHMENTS]\n")
         f.write(";;Name           Rain Gage        Outlet           Area     %Imperv  Width    %Slope   CurbLen  SnowPack        \n")

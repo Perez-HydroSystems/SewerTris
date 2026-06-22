@@ -249,6 +249,19 @@ def _deep_update(base: dict[str, Any], updates: dict[str, Any] | None) -> dict[s
     return result
 
 
+def _resolve_project_path(project: "SewerTrisProject", value: str | Path) -> str:
+    """Resolve project-configured paths while preserving existing absolute paths."""
+    path = Path(value).expanduser()
+    if path.is_absolute():
+        return str(path)
+    if path.exists():
+        return str(path)
+    project_relative = project.output_dir / path
+    if project_relative.exists():
+        return str(project_relative)
+    return str(project_relative)
+
+
 def _merge_change_groups(
     params: dict[str, Any] | None,
     changes: dict[str, Any],
@@ -1489,16 +1502,24 @@ class SewerTrisProject:
                 gwi_samples_per_pipe = gwi_raster_change.get("samples_per_pipe", 5)
                 if gwi_raster_path is None:
                     gwi_raster_path = self.generate_gwi_inflow_raster(
-                        min_value=gwi_raster_change.get("min_value", 0.00001),
-                        max_value=gwi_raster_change.get("max_value", 0.00005),
+                        min_value=gwi_raster_change.get("min_value", 0.001),
+                        max_value=gwi_raster_change.get("max_value", 0.010),
                         random_seed=gwi_raster_change.get("random_seed"),
+                        n_hills=gwi_raster_change.get("n_hills", 3),
+                        hill_min_value=gwi_raster_change.get("hill_min_value", 0.010),
+                        hill_max_value=gwi_raster_change.get("hill_max_value", 0.050),
+                        hill_radius_min=gwi_raster_change.get("hill_radius_min", 20),
+                        hill_radius_max=gwi_raster_change.get("hill_radius_max", 80),
+                        clip_to_range=gwi_raster_change.get("clip_to_range", True),
                     )
+                else:
+                    gwi_raster_path = _resolve_project_path(self, gwi_raster_path)
             elif gwi_raster_change is not None:
-                gwi_raster_path = gwi_raster_change
+                gwi_raster_path = _resolve_project_path(self, gwi_raster_change)
 
             if gwi_raster_path is not None:
                 scenario.assign_gwi_from_raster(
-                    raster_path=gwi_raster_path,
+                    raster_path=str(gwi_raster_path),
                     samples_per_pipe=gwi_samples_per_pipe,
                 )
             else:
@@ -1551,17 +1572,40 @@ class SewerTrisProject:
                     or rdii_raster_change.get("path")
                 )
                 if rdii_raster_path is None:
+                    min_density = rdii_raster_change.get("min_density", 0.1)
+                    max_density = rdii_raster_change.get("max_density", 3.0)
+                    n_hills = rdii_raster_change.get("n_hills", 3)
+                    hill_max_density = rdii_raster_change.get("hill_max_density", 10.0)
+                    clip_to_range = rdii_raster_change.get("clip_to_range", False)
                     rdii_raster_path = self.generate_rdii_density_raster(
-                        min_density=rdii_raster_change.get("min_density", 0.0),
-                        max_density=rdii_raster_change.get("max_density", 5.0),
+                        min_density=min_density,
+                        max_density=max_density,
                         random_seed=rdii_raster_change.get("random_seed"),
+                        n_hills=n_hills,
+                        hill_min_density=rdii_raster_change.get("hill_min_density", 2.0),
+                        hill_max_density=hill_max_density,
+                        hill_radius_min=rdii_raster_change.get("hill_radius_min", 20),
+                        hill_radius_max=rdii_raster_change.get("hill_radius_max", 80),
+                        clip_to_range=clip_to_range,
                     )
+                    if "rdii_to_imperv_scale" not in rdii_raster_change:
+                        upper_density = max_density
+                        if n_hills and not clip_to_range:
+                            upper_density = max(upper_density, hill_max_density)
+                        if upper_density == min_density:
+                            upper_density = min_density + 1.0
+                        rdii_params["rdii_to_imperv_scale"] = [
+                            min_density,
+                            upper_density,
+                        ]
+                else:
+                    rdii_raster_path = _resolve_project_path(self, rdii_raster_path)
                 if "rdii_to_imperv_scale" in rdii_raster_change:
                     rdii_params["rdii_to_imperv_scale"] = rdii_raster_change[
                         "rdii_to_imperv_scale"
                     ]
             elif rdii_raster_change is not None:
-                rdii_raster_path = rdii_raster_change
+                rdii_raster_path = _resolve_project_path(self, rdii_raster_change)
 
             rdii_params.pop("subcatchments_path", None)
             rdii_timeseries = rdii_params.pop("timeseries", None)
@@ -1626,7 +1670,7 @@ class SewerTrisProject:
             rdii_params["timeseries"] = rdii_timeseries
             if rdii_raster_path is not None:
                 scenario.add_subcatchment_rdii_raster(
-                    rdii_raster_path=rdii_raster_path,
+                    rdii_raster_path=str(rdii_raster_path),
                     **rdii_params,
                 )
             else:
@@ -2630,9 +2674,15 @@ class SewerTrisProject:
     def generate_gwi_inflow_raster(
         self,
         output_path: str | Path | None = None,
-        min_value: float = 0.00001,
-        max_value: float = 0.00005,
+        min_value: float = 0.001,
+        max_value: float = 0.010,
         random_seed: int | None = None,
+        n_hills: int = 3,
+        hill_min_value: float = 0.010,
+        hill_max_value: float = 0.050,
+        hill_radius_min: float = 20,
+        hill_radius_max: float = 80,
+        clip_to_range: bool = True,
     ) -> Path:
         """Generate a spatially variable GWI inflow coefficient raster."""
         from .hydrology import generate_random_inflow_raster
@@ -2644,6 +2694,12 @@ class SewerTrisProject:
             min_value=min_value,
             max_value=max_value,
             random_seed=random_seed,
+            n_hills=n_hills,
+            hill_min_value=hill_min_value,
+            hill_max_value=hill_max_value,
+            hill_radius_min=hill_radius_min,
+            hill_radius_max=hill_radius_max,
+            clip_to_range=clip_to_range,
         )
         self.record_step(
             "10_generate_gwi_inflow_raster",
@@ -2652,6 +2708,12 @@ class SewerTrisProject:
                 "min_value": min_value,
                 "max_value": max_value,
                 "random_seed": random_seed,
+                "n_hills": n_hills,
+                "hill_min_value": hill_min_value,
+                "hill_max_value": hill_max_value,
+                "hill_radius_min": hill_radius_min,
+                "hill_radius_max": hill_radius_max,
+                "clip_to_range": clip_to_range,
             },
             outputs={"gwi_raster_path": output},
         )
@@ -2663,6 +2725,12 @@ class SewerTrisProject:
         min_density: float = 0.0,
         max_density: float = 5.0,
         random_seed: int | None = None,
+        n_hills: int = 5,
+        hill_min_density: float = 2.0,
+        hill_max_density: float = 10.0,
+        hill_radius_min: float = 20,
+        hill_radius_max: float = 80,
+        clip_to_range: bool = False,
     ) -> Path:
         """Generate a spatially variable RDII density raster."""
         from .hydrology import generate_random_rdii_density_raster
@@ -2674,6 +2742,12 @@ class SewerTrisProject:
             min_density=min_density,
             max_density=max_density,
             random_seed=random_seed,
+            n_hills=n_hills,
+            hill_min_density=hill_min_density,
+            hill_max_density=hill_max_density,
+            hill_radius_min=hill_radius_min,
+            hill_radius_max=hill_radius_max,
+            clip_to_range=clip_to_range,
         )
         self.record_step(
             "10_generate_rdii_density_raster",
@@ -2682,6 +2756,12 @@ class SewerTrisProject:
                 "min_density": min_density,
                 "max_density": max_density,
                 "random_seed": random_seed,
+                "n_hills": n_hills,
+                "hill_min_density": hill_min_density,
+                "hill_max_density": hill_max_density,
+                "hill_radius_min": hill_radius_min,
+                "hill_radius_max": hill_radius_max,
+                "clip_to_range": clip_to_range,
             },
             outputs={"rdii_raster_path": output},
         )

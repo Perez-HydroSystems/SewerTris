@@ -138,6 +138,7 @@ def build_domain_mask_from_shapefile(
 
     return domain_mask, grid_meta
 
+
 __all__ = [
     "download_city_boundary",
     "utm_epsg_from_lon",

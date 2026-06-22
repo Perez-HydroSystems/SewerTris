@@ -593,9 +593,8 @@ def test_sibling_replay_applies_gwi_and_rdii_rasters(monkeypatch, tmp_path):
         fake_add_subcatchment_rdii_raster,
     )
 
-    gwi_raster = tmp_path / "gwi.tif"
+    gwi_raster = "rasters/gwi.tif"
     rdii_raster = tmp_path / "rdii.tif"
-    gwi_raster.write_bytes(b"gwi")
     rdii_raster.write_bytes(b"rdii")
 
     sibling = base.clone_sibling(
@@ -619,13 +618,86 @@ def test_sibling_replay_applies_gwi_and_rdii_rasters(monkeypatch, tmp_path):
 
     assert sibling.metadata["lineage"]["rerun_from"] == "10_dynamic_flow_input_definition_base_model"
     assert "gwi_pipe_length" not in calls
-    assert calls["gwi_raster"]["raster_path"] == str(gwi_raster)
+    assert calls["gwi_raster"]["raster_path"] == str(sibling.output_dir / gwi_raster)
     assert calls["gwi_raster"]["samples_per_pipe"] == 7
     assert "rdii_uniform" not in calls
     assert calls["rdii_raster"]["rdii_raster_path"] == str(rdii_raster)
     assert calls["rdii_raster"]["rdii_to_imperv_scale"] == [0.0, 300.0]
     assert "imperv_pct" not in calls["rdii_raster"]
     assert calls["rdii_raster"]["infiltration_params"] == [50, 0.5, 7, "", ""]
+
+
+def test_sibling_replay_generated_rdii_raster_sets_density_scale(monkeypatch, tmp_path):
+    import sewertris as sp
+
+    base = sp.SewerTrisProject(tmp_path / "base", cell_size_m=100, autosave=False)
+    base.record_step(
+        "10_dynamic_flow_input_definition_base_model",
+        parameters={
+            "options_dict": {
+                "START_DATE": "01/01/1990",
+                "START_TIME": "00:00:00",
+                "END_DATE": "01/02/1990",
+                "END_TIME": "00:00:00",
+            }
+        },
+    )
+    base.record_scenario_step(
+        "bwf_gwi_rdii",
+        "assign_gwi_from_pipe_length",
+        parameters={"coefficient": 0.00001},
+    )
+    base.record_scenario_step(
+        "bwf_gwi_rdii",
+        "add_subcatchment_rdii",
+        parameters={"timeseries": [["1/1/1990", "00:00", 0.0]], "imperv_pct": 5},
+    )
+
+    calls = {}
+
+    def fake_export_swmm(self, **kwargs):
+        self.swmm_inp_path.write_text("[TITLE]\n")
+        return self.swmm_inp_path
+
+    def fake_generate_rdii_density_raster(self, **kwargs):
+        calls["generate_rdii"] = kwargs
+        return self.rdii_raster_path
+
+    def fake_add_subcatchment_rdii_raster(self, **kwargs):
+        calls["rdii_raster"] = kwargs
+
+    monkeypatch.setattr(sp.SewerTrisProject, "export_swmm", fake_export_swmm)
+    monkeypatch.setattr(
+        sp.SewerTrisProject,
+        "generate_rdii_density_raster",
+        fake_generate_rdii_density_raster,
+    )
+    monkeypatch.setattr(sp.SewerTrisScenario, "assign_gwi_from_pipe_length", lambda *a, **k: None)
+    monkeypatch.setattr(
+        sp.SewerTrisScenario,
+        "add_subcatchment_rdii_raster",
+        fake_add_subcatchment_rdii_raster,
+    )
+
+    sibling = base.clone_sibling(
+        tmp_path / "sibling",
+        changes={
+            "rdii_raster": {
+                "min_density": 2.0,
+                "max_density": 6.0,
+                "n_hills": 2,
+                "hill_max_density": 14.0,
+            },
+        },
+        copy_artifacts=False,
+    )
+    sibling.rerun_from_parent_parameters(base, run_flow_components=False)
+
+    assert calls["generate_rdii"]["min_density"] == 2.0
+    assert calls["generate_rdii"]["hill_max_density"] == 14.0
+    assert calls["rdii_raster"]["rdii_raster_path"] == str(sibling.rdii_raster_path)
+    assert calls["rdii_raster"]["rdii_to_imperv_scale"] == [2.0, 14.0]
+    assert "imperv_pct" not in calls["rdii_raster"]
 
 
 def test_pipe_topology_aliases_support_geopackage_and_shapefile_names():
