@@ -36,3 +36,6 @@ where = ["src"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+markers = [
+    "slow: runs a real EPA-SWMM simulation (deselect with '-m \"not slow\"')",
+]
