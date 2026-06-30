@@ -2,7 +2,8 @@
 **SewerTris** is a Python framework for generating synthetic urban layouts and sanitary sewer networks, and for simulating their hydrologic–hydraulic behavior in EPA-SWMM for controlled experimentation, methodological benchmarking, and sensitivity analysis of sanitary sewer system design and monitoring, supporting research and infrastructure planning.
 
 <p align="center">
-  <img src="docs/images/SewerTris.png" width="700">
+  <img src="docs/images/SewerTris2.png" width="380" style="vertical-align: middle;">
+  <img src="docs/images/pipeline_from_project.gif" width="350" style="vertical-align: middle;">
 </p>
 
 ---
@@ -88,20 +89,6 @@ This modular structure enables systematic experimentation across multiple synthe
 
 ---
 
-## 📦 Repository Structure
-```bash
-sewertris/
-├── src/sewertris/        # Python package source code
-│   ├── core.py           # Network and urban generation
-│   ├── plots.py          # Visualization utilities
-│   └── swmm.py           # SWMM model creation and simulation
-├── examples/             # Demonstration notebooks and sample inputs
-│   └── notebooks/
-├── tests/                # Basic unit and smoke tests
-└── docs/                 # (Optional) documentation site
-```
----
-
 ## ⚙️ Installation
 
 ### 1. Clone the repository
@@ -111,70 +98,82 @@ git clone https://github.com/Perez-HydroSystems/sewertris.git
 cd sewertris
 ```
 
-### 2. Create a virtual environment
+### 2. Create and activate the environment
 
 ```bash
 conda env create -f environment_sewertris.yml
 conda activate sewertris
 ```
 
+### 3. Install SewerTris (editable)
+
+Register the package so that `import sewertris` works from anywhere:
+
+```bash
+pip install -e .
+```
+
+> Optional — expose the environment as a Jupyter kernel for the example notebooks:
+> ```bash
+> python -m ipykernel install --user --name sewertris --display-name "Python (sewertris)"
+> ```
+
 ---
 ## 🚀 Quick Start
 
-After installation
+SewerTris is built around a `SewerTrisProject` that owns the output folder, standard files, and
+metadata. A minimal end-to-end run looks like this (simplified — see the notebooks for complete,
+runnable code):
 
-```bash
-import sewertris as st
+```python
+import sewertris as sp
 
-# Example workflow (simplified)
-city = st.generate_city(seed=42)
-network = st.generate_sewer_network(city)
-model = st.build_swmm_model(network)
+# Create a project (owns its output directory and artifacts)
+project = sp.SewerTrisProject("output_my_project", cell_size_m=100, name="My Project")
 
-results = st.run_swmm(model)
-st.plot_hydrograph(results)
+# 1–3. Domain definition + stochastic tetris layout
+project.define_domain(domain_mask=mask, cell_size_m=100)
+project.complete_tetris_layout(crs="EPSG:3857", seed=42)
+
+# 4–7. Roads, land use, synthetic DEM, and the gravity sewer network
+project.generate_roads(road_width=10)
+project.assign_land_use()
+project.generate_topography(config=sp.TopographyConfig())
+project.generate_sewer_network_V2(road_width=10, block_size=200)
+
+# 8–9. Flow predesign + pipe sizing
+project.predesign_flows(land_use_info=LAND_USE_INFO)
+project.design_pipes()
+
+# 10–11. Export and run an EPA-SWMM scenario
+project.export_swmm(options_dict=options)
+scenario = project.create_run("baseline")
+depths, flows = scenario.run_swmm(monitored_nodes=["OUTLET"], monitored_links=["P_OUTLET"])
+
+# Bonus: animate the whole build (tetris → roads → manholes → sewer) as a GIF
+sp.animate_pipeline(project, out_path=project.path("pipeline.gif"))
 ```
-See the example notebooks in examples/notebooks/ for complete workflows.
+
+See the example notebooks in [`Examples/`](Examples/) for complete, runnable workflows.
 
 ---
-## 🔬 Reproducible Research Applications
+## 📊 Example Notebooks
 
-SewerTris enables:
-- Synthetic benchmark dataset generation
-- Hydrograph separation and I&I quantification
-- Sensitivity analysis of sewer design parameters
-- Evaluation of monitoring and calibration strategies
-- Testing of data-driven or AI-based sewer models
+All notebooks live in [`Examples/`](Examples/). The `*_project` notebooks use the project-oriented
+`SewerTrisProject` API; the matching non-`project` notebooks build the same workflow function-by-function.
 
-Target users include:
-- Urban hydrology researchers
-- Wastewater utilities
-- Infrastructure planners
-- Environmental modeling scientists
----
-## 📊 Example Outputs
-Typical SewerTris simulations produce:
-- Sewer network geometries
-- SWMM hydraulic time series
-- RDII/DWF/GWI component hydrographs
-- Spatial rasters and shapefiles
-- Reproducible benchmark datasets
----
-## 📦 Dependencies
+- **example_01_my_first_sewertris_project.ipynb** — End-to-end first project from a raster-mask domain (layout → roads → DEM → sewer → EPA-SWMM) using the `SewerTrisProject` API.
+- **example_01_my_first_sewertris.ipynb** — The same first workflow built step-by-step with explicit paths (no project object).
+- **example_02_Stillwater_sewertris_project.ipynb** — Stillwater case generated from a real shapefile domain via the project API.
+- **example_02_Stillwater_sewertris.ipynb** — Stillwater case built function-by-function from the shapefile domain.
+- **example_03_Stillwater_4tetromino_sewertris_project.ipynb** — Sibling of the Stillwater project restricted to a 4-tetromino (I/O/T/S) block set.
+- **example_04_Stillwater_GWI_RDII_heterogeneity_sewertris_project.ipynb** — Sibling exploring spatially heterogeneous GWI and RDII inputs.
+- **example_05A_Stillwater_prepare_ensemble_siblings.ipynb** — Prepare an ensemble of stochastic siblings from a completed base project.
+- **example_05B_Stillwater_run_ensemble_simulations.ipynb** — Run EPA-SWMM across the prepared ensemble of siblings.
+- **example_05C_Stillwater_compare_ensemble_outputs.ipynb** — Aggregate and compare decomposed flow outputs across the ensemble.
+- **example_06_animate_pipeline.ipynb** — Render the full workflow (tetris → roads → manholes → sewer) as an animated GIF with `animate_pipeline`.
+- **example_siblings_types.ipynb** — Overview of sibling types and the `clone_sibling` / `rerun_from_parent_parameters` workflow.
 
-Core scientific Python stack:
-- NumPy
-- Pandas
-- GeoPandas
-- Shapely
-- Rasterio
-- NetworkX
-- Matplotlib
-- SciPy
-- xarray
-- PyProj
-- scikit-image
-- PySWMM (SWMM interface)
 ---
 ## 🧪 Testing
 
@@ -213,7 +212,3 @@ Professor — Civil & Environmental Engineering
 Oklahoma State University
 https://experts.okstate.edu/gabriel.perez_mesa
 
----
-## ⭐ Acknowledgment
-
-SewerTris is developed as part of doctoral and faculty-led research in urban hydrology, sanitary sewer modeling, and reproducible water infrastructure science, supporting open and transparent scientific software for water resources engineering.

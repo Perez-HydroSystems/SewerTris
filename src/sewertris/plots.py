@@ -359,6 +359,354 @@ def plot_sewer_network_all(
     plt.tight_layout()
     plt.show()
 
+# Friendly tetromino names for the layout legend (matches the reference figure).
+_SHAPE_NAMES = {
+    "I": "I-Shape", "O": "O-Shape", "T": "T-Shape", "S": "S-Shape",
+    "Z": "Z-Shape", "J": "J-Shape", "L": "L-Shape", "BO": "Block",
+}
+
+def animate_pipeline(
+    source,
+    out_path="sewertris_pipeline.gif",
+    pieces_per_frame=1,
+    manholes_per_frame=8,
+    pipes_per_frame=2,
+    road_ramp_frames=6,
+    frame_ms=60,
+    hold_ms=600,
+    figsize=(16, 8),
+    dpi=110,
+    title_fontsize=48,
+    legend_fontsize=24,
+    manhole_size=36,
+    tetromino_set="full",
+):
+    """Build a single GIF animating the full SewerTris workflow.
+
+    The animation reveals, progressively element-by-element and in order:
+
+    1. **Tetris completion** -- layout pieces fill the domain (rising "Completion %").
+    2. **Road network** -- roads grow inside the completed layout.
+    3. **Manholes** -- manholes drop into place along the roads.
+    4. **Sewer network** -- pipes are drawn one-by-one (main -> secondary -> tertiary).
+
+    Parameters
+    ----------
+    source : SewerTrisProject | str | pathlib.Path
+        Either an in-memory project (uses its ``*_path`` properties) or a path to a
+        project output folder containing the standard ``.gpkg`` artifacts
+        (``city_layout``, ``road_polygons``, ``road_centerlines``, ``manholes``,
+        ``sewer_pipes``). Missing layers are skipped gracefully.
+    out_path : str | pathlib.Path
+        Destination ``.gif`` path.
+    pieces_per_frame, manholes_per_frame, pipes_per_frame : int
+        How many elements to reveal per frame in each stage (higher = fewer frames).
+    road_ramp_frames : int
+        Number of fade-in frames used to grow the road layer.
+    frame_ms, hold_ms : int
+        Per-frame duration and the longer pause held at the end of each stage (ms).
+        Lower values play the GIF faster.
+    figsize, dpi : tuple, int
+        Matplotlib figure size and resolution for every frame.
+    title_fontsize, legend_fontsize : int
+        Font sizes for the stage title and the legend (incl. its title).
+    manhole_size : int
+        Marker area for manholes (the outlet triangle is drawn larger).
+    tetromino_set : str
+        Name passed to :func:`sewertris.layout.get_tetromino_set` for the color map.
+
+    Returns
+    -------
+    str | pathlib.Path
+        ``out_path`` (the written GIF).
+    """
+    if plt is None or gpd is None:
+        raise ImportError("animate_pipeline requires matplotlib and geopandas.")
+
+    from io import BytesIO
+    from PIL import Image
+    from matplotlib.patches import Patch
+    from matplotlib.lines import Line2D
+    from .layout import get_tetromino_set
+
+    # --- resolve file paths (project object OR folder path) -------------------
+    if hasattr(source, "output_dir"):
+        paths = {
+            "layout": Path(source.layout_blocks_path),
+            "road_poly": Path(source.road_polygons_path),
+            "road_lines": Path(source.road_centerlines_path),
+            "manholes": Path(source.manholes_path),
+            "pipes": Path(source.pipes_path),
+        }
+    else:
+        base = Path(source)
+        paths = {
+            "layout": base / "city_layout.gpkg",
+            "road_poly": base / "road_polygons.gpkg",
+            "road_lines": base / "road_centerlines.gpkg",
+            "manholes": base / "manholes.gpkg",
+            "pipes": base / "sewer_pipes.gpkg",
+        }
+
+    def _safe_read(p):
+        try:
+            if p is not None and Path(p).exists():
+                g = gpd.read_file(p)
+                return g if len(g) else None
+        except Exception:
+            return None
+        return None
+
+    layout = _safe_read(paths["layout"])
+    if layout is None:
+        raise FileNotFoundError(f"Layout layer not found or empty: {paths['layout']}")
+    road_poly = _safe_read(paths["road_poly"])
+    road_lines = _safe_read(paths["road_lines"])
+    manholes = _safe_read(paths["manholes"])
+    pipes = _safe_read(paths["pipes"])
+
+    # --- order layers for progressive reveal ---------------------------------
+    if "figure_id" in layout.columns:
+        layout = layout.sort_values("figure_id").reset_index(drop=True)
+    else:
+        layout = layout.reset_index(drop=True)
+
+    if pipes is not None and "type" in pipes.columns:
+        tier_rank = {"main": 0, "secondary": 1, "tertiary": 2}
+        pipes = pipes.assign(
+            _rank=pipes["type"].map(lambda t: tier_rank.get(str(t), 3))
+        ).sort_values("_rank", kind="stable").reset_index(drop=True)
+    elif pipes is not None:
+        pipes = pipes.reset_index(drop=True)
+
+    # --- tetromino color map -------------------------------------------------
+    try:
+        _, tcolors = get_tetromino_set(tetromino_set)
+    except Exception:
+        tcolors = {}
+
+    def _label_color(lbl):
+        return tcolors.get(str(lbl), "0.5")
+
+    # --- domain boundary from the layout polygons ----------------------------
+    try:
+        domain_geom = layout.geometry.union_all()
+    except Exception:
+        domain_geom = layout.geometry.unary_union
+    domain_boundary = gpd.GeoSeries([domain_geom.boundary], crs=layout.crs)
+
+    # --- fixed extent across every frame -------------------------------------
+    bounds = [layout.total_bounds]
+    for g in (road_poly, road_lines, manholes, pipes):
+        if g is not None:
+            bounds.append(g.total_bounds)
+    bounds = np.array(bounds)
+    minx, miny = bounds[:, 0].min(), bounds[:, 1].min()
+    maxx, maxy = bounds[:, 2].max(), bounds[:, 3].max()
+    mx = 0.05 * ((maxx - minx) or 1.0)
+    my = 0.05 * ((maxy - miny) or 1.0)
+    xlim = (minx - mx, maxx + mx)
+    ylim = (miny - my, maxy + my)
+
+    # --- manhole elevation color normalization (stable across frames) --------
+    terrain = plt.get_cmap("terrain")
+    if manholes is not None and "elevation" in manholes.columns:
+        elev = manholes["elevation"].astype(float)
+        elev_norm = colors.Normalize(vmin=float(elev.min()), vmax=float(elev.max()))
+    else:
+        elev_norm = None
+
+    # --- locate the network outlet (terminal downstream manhole) -------------
+    outlet_geom = None
+    if (
+        pipes is not None
+        and {"upstream_m", "downstream_m"}.issubset(pipes.columns)
+        and manholes is not None
+        and "id" in manholes.columns
+    ):
+        from collections import Counter
+        up_ids = set(pipes["upstream_m"].astype(str))
+        terminals = [d for d in pipes["downstream_m"].astype(str) if d not in up_ids]
+        if terminals:
+            outlet_id = Counter(terminals).most_common(1)[0][0]
+            match = manholes[manholes["id"].astype(str) == outlet_id]
+            if len(match):
+                outlet_geom = match.geometry.iloc[0]
+    if outlet_geom is None and manholes is not None and "elevation" in manholes.columns:
+        outlet_geom = manholes.geometry.loc[manholes["elevation"].astype(float).idxmin()]
+
+    # --- legend handles ------------------------------------------------------
+    boundary_handle = Line2D([0], [0], color="black", lw=1.5, label="Domain Boundary")
+    tetro_handles = [
+        Patch(facecolor=_label_color(k), edgecolor="black",
+              label=_SHAPE_NAMES.get(k, str(k)))
+        for k in tcolors
+    ] + [boundary_handle]
+    roads_handles = [
+        Patch(facecolor="0.45", edgecolor="none", label="Roads"),
+        boundary_handle,
+    ]
+    manhole_handle = Line2D(
+        [0], [0], marker="o", color="w", markerfacecolor="0.5",
+        markeredgecolor="k", markersize=12, lw=0, label="Manholes",
+    )
+    outlet_handle = Line2D(
+        [0], [0], marker="^", color="w", markerfacecolor="lime",
+        markeredgecolor="k", markersize=15, lw=0, label="Outlet",
+    )
+    pipe_handles = [
+        Line2D([0], [0], color="red", lw=2.2, label="Main"),
+        Line2D([0], [0], color="orange", lw=1.6, label="Secondary"),
+        Line2D([0], [0], color="green", lw=1.2, label="Tertiary"),
+        manhole_handle,
+        outlet_handle,
+        boundary_handle,
+    ]
+
+    # --- figure + frame capture ----------------------------------------------
+    plt.ioff()
+    fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+    fig.subplots_adjust(left=0.02, right=0.70, top=0.85, bottom=0.02)
+    frames, durations = [], []
+
+    def _grab(hold=False):
+        buf = BytesIO()
+        fig.savefig(buf, format="png")
+        buf.seek(0)
+        frames.append(Image.open(buf).convert("RGB").copy())
+        durations.append(int(hold_ms if hold else frame_ms))
+        buf.close()
+
+    def _base_axes(title):
+        ax.clear()
+        ax.set_xlim(*xlim)
+        ax.set_ylim(*ylim)
+        ax.set_aspect("equal", adjustable="box")
+        ax.set_axis_off()
+        ax.set_title(title, fontsize=title_fontsize)
+        domain_boundary.plot(ax=ax, color="black", linewidth=1.5)
+
+    def _legend(handles, title=None):
+        ax.legend(handles=handles, title=title, loc="center left",
+                  bbox_to_anchor=(1.0, 0.5), fontsize=legend_fontsize,
+                  title_fontsize=legend_fontsize, frameon=True)
+
+    def _draw_layout(subset, alpha=1.0):
+        if subset is None or len(subset) == 0:
+            return
+        if "label" in subset.columns:
+            cols = [_label_color(l) for l in subset["label"]]
+        else:
+            cols = "0.6"
+        subset.plot(ax=ax, color=cols, edgecolor="black", linewidth=0.3, alpha=alpha)
+
+    def _draw_roads_bg(poly_alpha=0.85):
+        if road_poly is not None:
+            road_poly.plot(ax=ax, color="0.45", alpha=poly_alpha, edgecolor="none")
+        if road_lines is not None:
+            road_lines.plot(ax=ax, color="white", linewidth=1.0)
+
+    def _draw_blocks_white(alpha=1.0):
+        # Once roads exist, the blocks are shown white (color only matters during
+        # the tetris stage, where _draw_layout is used instead).
+        layout.plot(ax=ax, color="white", edgecolor="black", linewidth=0.3, alpha=alpha)
+
+    def _draw_outlet():
+        if outlet_geom is not None:
+            ax.scatter(
+                [outlet_geom.x], [outlet_geom.y], marker="^", c="lime",
+                s=manhole_size * 4, edgecolor="k", linewidth=0.8, zorder=8,
+            )
+
+    def _counts(n, step):
+        vals = list(range(max(1, step), n + 1, max(1, step)))
+        if not vals or vals[-1] != n:
+            vals.append(n)
+        return vals
+
+    # === Stage 1: Tetris completion ==========================================
+    total = len(layout)
+    for k in _counts(total, pieces_per_frame):
+        _base_axes(f"Completion: {100.0 * k / total:.1f}%")
+        _draw_layout(layout.iloc[:k])
+        _legend(tetro_handles, title="Tetris Shapes")
+        _grab(hold=(k == total))
+
+    # === Stage 2: Road network ===============================================
+    if road_poly is not None or road_lines is not None:
+        ramp = max(1, int(road_ramp_frames))
+        for i in range(1, ramp + 1):
+            a = i / ramp
+            _base_axes("Road network")
+            _draw_layout(layout, alpha=0.35)
+            if road_poly is not None:
+                road_poly.plot(ax=ax, color="0.45", alpha=0.85 * a, edgecolor="none")
+            if road_lines is not None:
+                road_lines.plot(ax=ax, color="white", linewidth=1.0 * a)
+            _legend(roads_handles)
+            _grab(hold=(i == ramp))
+
+    # === Stage 3: Manhole placement ==========================================
+    if manholes is not None:
+        mx_pts = manholes.geometry.x.values
+        my_pts = manholes.geometry.y.values
+        if elev_norm is not None:
+            pt_colors = terrain(elev_norm(manholes["elevation"].astype(float).values))
+        else:
+            pt_colors = "0.5"
+        total_mh = len(manholes)
+        for k in _counts(total_mh, manholes_per_frame):
+            _base_axes("Manhole placement")
+            _draw_blocks_white()
+            _draw_roads_bg()
+            ax.scatter(
+                mx_pts[:k], my_pts[:k],
+                c=(pt_colors[:k] if elev_norm is not None else pt_colors),
+                s=manhole_size, edgecolor="k", linewidth=0.3, zorder=5,
+            )
+            done = k == total_mh
+            if done and outlet_geom is not None:
+                # Highlight the outlet once every manhole is placed.
+                _draw_outlet()
+                _legend([manhole_handle, outlet_handle, boundary_handle])
+            else:
+                _legend([manhole_handle, boundary_handle])
+            _grab(hold=done)
+
+    # === Stage 4: Sewer network ==============================================
+    if pipes is not None:
+        tier_color = {"main": "red", "secondary": "orange", "tertiary": "green"}
+        for k in _counts(len(pipes), pipes_per_frame):
+            _base_axes("Sewer network")
+            _draw_blocks_white()
+            _draw_roads_bg(poly_alpha=0.6)
+            if manholes is not None:
+                ax.scatter(mx_pts, my_pts, c="0.3", s=manhole_size * 0.35, zorder=4)
+            sub = pipes.iloc[:k]
+            if "type" in sub.columns:
+                for tier, col in tier_color.items():
+                    seg = sub[sub["type"] == tier]
+                    if len(seg):
+                        lw = 2.2 if tier == "main" else (1.6 if tier == "secondary" else 1.2)
+                        seg.plot(ax=ax, color=col, linewidth=lw, zorder=6)
+            else:
+                sub.plot(ax=ax, color="red", linewidth=1.5, zorder=6)
+            _draw_outlet()
+            _legend(pipe_handles)
+            _grab(hold=(k == len(pipes)))
+
+    # --- write the GIF (Pillow; no extra dependency) -------------------------
+    out_path = str(out_path)
+    if not frames:
+        plt.close(fig)
+        raise RuntimeError("No frames were produced for the animation.")
+    frames[0].save(
+        out_path, save_all=True, append_images=frames[1:],
+        duration=durations, loop=0, disposal=2,
+    )
+    plt.close(fig)
+    return out_path
+
 def generate_clustered_rainfall_timeseries(
     start_date="2000-01-01 00:00",
     end_date="2020-12-31 23:45",
@@ -2601,4 +2949,5 @@ __all__ = [
     "plot_final_design_color_by_diameter",
     "plot_inflow_from_pipe_length",
     "plot_two_models",
+    "animate_pipeline",
 ]
