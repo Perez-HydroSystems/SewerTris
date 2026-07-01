@@ -378,7 +378,7 @@ def animate_pipeline(
     dpi=110,
     title_fontsize=48,
     legend_fontsize=24,
-    manhole_size=108,
+    manhole_size=162,
     tetromino_set="full",
 ):
     """Build a single GIF animating the full SewerTris workflow.
@@ -508,14 +508,6 @@ def animate_pipeline(
     xlim = (minx - mx, maxx + mx)
     ylim = (miny - my, maxy + my)
 
-    # --- manhole elevation color normalization (stable across frames) --------
-    terrain = plt.get_cmap("terrain")
-    if manholes is not None and "elevation" in manholes.columns:
-        elev = manholes["elevation"].astype(float)
-        elev_norm = colors.Normalize(vmin=float(elev.min()), vmax=float(elev.max()))
-    else:
-        elev_norm = None
-
     # --- locate the network outlet (terminal downstream manhole) -------------
     outlet_geom = None
     if (
@@ -547,7 +539,7 @@ def animate_pipeline(
         boundary_handle,
     ]
     manhole_handle = Line2D(
-        [0], [0], marker="o", color="w", markerfacecolor="0.5",
+        [0], [0], marker="o", color="w", markerfacecolor="black",
         markeredgecolor="k", markersize=12, lw=0, label="Manholes",
     )
     outlet_handle = Line2D(
@@ -560,7 +552,6 @@ def animate_pipeline(
         Line2D([0], [0], color="green", lw=2.4, label="Tertiary"),
         manhole_handle,
         outlet_handle,
-        boundary_handle,
     ]
 
     # --- figure + frame capture ----------------------------------------------
@@ -577,14 +568,15 @@ def animate_pipeline(
         durations.append(int(hold_ms if hold else frame_ms))
         buf.close()
 
-    def _base_axes(title):
+    def _base_axes(title, boundary=True):
         ax.clear()
         ax.set_xlim(*xlim)
         ax.set_ylim(*ylim)
         ax.set_aspect("equal", adjustable="box")
         ax.set_axis_off()
         ax.set_title(title, fontsize=title_fontsize)
-        domain_boundary.plot(ax=ax, color="black", linewidth=1.5)
+        if boundary:
+            domain_boundary.plot(ax=ax, color="black", linewidth=1.5)
 
     def _legend(handles, title=None):
         ax.legend(handles=handles, title=title, loc="center left",
@@ -650,10 +642,6 @@ def animate_pipeline(
     if manholes is not None:
         mx_pts = manholes.geometry.x.values
         my_pts = manholes.geometry.y.values
-        if elev_norm is not None:
-            pt_colors = terrain(elev_norm(manholes["elevation"].astype(float).values))
-        else:
-            pt_colors = "0.5"
         total_mh = len(manholes)
         for k in _counts(total_mh, manholes_per_frame):
             _base_axes("Manhole placement")
@@ -661,8 +649,7 @@ def animate_pipeline(
             _draw_roads_bg()
             ax.scatter(
                 mx_pts[:k], my_pts[:k],
-                c=(pt_colors[:k] if elev_norm is not None else pt_colors),
-                s=manhole_size, edgecolor="k", linewidth=0.3, zorder=5,
+                c="black", s=manhole_size, edgecolor="k", linewidth=0.3, zorder=5,
             )
             done = k == total_mh
             if done and outlet_geom is not None:
@@ -677,11 +664,10 @@ def animate_pipeline(
     if pipes is not None:
         tier_color = {"main": "red", "secondary": "orange", "tertiary": "green"}
         for k in _counts(len(pipes), pipes_per_frame):
-            _base_axes("Sewer network")
-            _draw_blocks_white()
-            _draw_roads_bg(poly_alpha=0.6)
+            # Sewer stage shows only manholes and pipes: no blocks, roads, or boundary.
+            _base_axes("Sewer network", boundary=False)
             if manholes is not None:
-                ax.scatter(mx_pts, my_pts, c="0.3", s=manhole_size * 1.05, zorder=4)
+                ax.scatter(mx_pts, my_pts, c="black", s=manhole_size * 1.05, zorder=4)
             sub = pipes.iloc[:k]
             if "type" in sub.columns:
                 for tier, col in tier_color.items():

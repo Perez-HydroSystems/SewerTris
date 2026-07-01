@@ -4,7 +4,7 @@
 <p align="center">
   <img src="docs/images/SewerTris2.png" width="300" style="vertical-align: middle;">
 <p align="center">
-  <img src="docs/images/pipeline_from_project.gif" width="500" style="vertical-align: middle;">
+  <img src="docs/images/pipeline.gif" width="500" style="vertical-align: middle;">
 </p>
 
 ---
