@@ -378,7 +378,7 @@ def animate_pipeline(
     dpi=110,
     title_fontsize=48,
     legend_fontsize=24,
-    manhole_size=36,
+    manhole_size=108,
     tetromino_set="full",
 ):
     """Build a single GIF animating the full SewerTris workflow.
@@ -555,9 +555,9 @@ def animate_pipeline(
         markeredgecolor="k", markersize=15, lw=0, label="Outlet",
     )
     pipe_handles = [
-        Line2D([0], [0], color="red", lw=2.2, label="Main"),
-        Line2D([0], [0], color="orange", lw=1.6, label="Secondary"),
-        Line2D([0], [0], color="green", lw=1.2, label="Tertiary"),
+        Line2D([0], [0], color="red", lw=4.4, label="Main"),
+        Line2D([0], [0], color="orange", lw=3.2, label="Secondary"),
+        Line2D([0], [0], color="green", lw=2.4, label="Tertiary"),
         manhole_handle,
         outlet_handle,
         boundary_handle,
@@ -681,16 +681,16 @@ def animate_pipeline(
             _draw_blocks_white()
             _draw_roads_bg(poly_alpha=0.6)
             if manholes is not None:
-                ax.scatter(mx_pts, my_pts, c="0.3", s=manhole_size * 0.35, zorder=4)
+                ax.scatter(mx_pts, my_pts, c="0.3", s=manhole_size * 1.05, zorder=4)
             sub = pipes.iloc[:k]
             if "type" in sub.columns:
                 for tier, col in tier_color.items():
                     seg = sub[sub["type"] == tier]
                     if len(seg):
-                        lw = 2.2 if tier == "main" else (1.6 if tier == "secondary" else 1.2)
+                        lw = 4.4 if tier == "main" else (3.2 if tier == "secondary" else 2.4)
                         seg.plot(ax=ax, color=col, linewidth=lw, zorder=6)
             else:
-                sub.plot(ax=ax, color="red", linewidth=1.5, zorder=6)
+                sub.plot(ax=ax, color="red", linewidth=3.0, zorder=6)
             _draw_outlet()
             _legend(pipe_handles)
             _grab(hold=(k == len(pipes)))

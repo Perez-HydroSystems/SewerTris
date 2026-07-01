@@ -171,7 +171,6 @@ All notebooks live in [`Examples/`](Examples/). The `*_project` notebooks use th
 - **example_05A_Stillwater_prepare_ensemble_siblings.ipynb** — Prepare an ensemble of stochastic siblings from a completed base project.
 - **example_05B_Stillwater_run_ensemble_simulations.ipynb** — Run EPA-SWMM across the prepared ensemble of siblings.
 - **example_05C_Stillwater_compare_ensemble_outputs.ipynb** — Aggregate and compare decomposed flow outputs across the ensemble.
-- **example_06_animate_pipeline.ipynb** — Render the full workflow (tetris → roads → manholes → sewer) as an animated GIF with `animate_pipeline`.
 - **example_siblings_types.ipynb** — Overview of sibling types and the `clone_sibling` / `rerun_from_parent_parameters` workflow.
 
 ---
