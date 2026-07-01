@@ -2,8 +2,9 @@
 **SewerTris** is a Python framework for generating synthetic urban layouts and sanitary sewer networks, and for simulating their hydrologic–hydraulic behavior in EPA-SWMM for controlled experimentation, methodological benchmarking, and sensitivity analysis of sanitary sewer system design and monitoring, supporting research and infrastructure planning.
 
 <p align="center">
-  <img src="docs/images/SewerTris2.png" width="380" style="vertical-align: middle;">
-  <img src="docs/images/pipeline_from_project.gif" width="350" style="vertical-align: middle;">
+  <img src="docs/images/SewerTris2.png" width="300" style="vertical-align: middle;">
+<p align="center">
+  <img src="docs/images/pipeline_from_project.gif" width="500" style="vertical-align: middle;">
 </p>
 
 ---
