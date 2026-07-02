@@ -36,7 +36,7 @@ def delineate_afferent_areas_and_baseflow(
 
     # Voronoi polygons
     points = MultiPoint(midpoints.geometry.tolist())
-    envelope = blocks.unary_union.envelope.buffer(100)
+    envelope = blocks.union_all().envelope.buffer(100)
     vor = voronoi_diagram(points, envelope=envelope)
     voronoi_polygons = gpd.GeoDataFrame(geometry=[p for p in vor.geoms], crs=blocks.crs)
 
@@ -1067,7 +1067,7 @@ def create_building_density_raster(boundary_path, output_raster, resolution=100.
 
     # 3. Download buildings from OSM using polygon (NOT Edmond)
     try:
-        boundary_poly_wgs84 = boundary_wgs84.unary_union
+        boundary_poly_wgs84 = boundary_wgs84.union_all()
         print("Querying OSM for buildings within boundary polygon...")
         buildings = ox.features_from_polygon(
             boundary_poly_wgs84,
@@ -1155,7 +1155,7 @@ def create_building_density_raster(boundary_path, output_raster, resolution=100.
     density = building_count / pixel_area_sq_km
 
     # 8. Apply boundary mask so values outside are set to 0
-    boundary_geom_proj = boundary_proj.unary_union
+    boundary_geom_proj = boundary_proj.union_all()
     boundary_mask = rasterize(
         [(boundary_geom_proj, 1)],
         out_shape=(height, width),

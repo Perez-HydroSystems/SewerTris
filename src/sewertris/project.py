@@ -2253,7 +2253,7 @@ class SewerTrisProject:
 
         road_lines = self.state.get("road_lines")
         if road_lines is None:
-            road_lines = gpd.read_file(road_axes).geometry.unary_union
+            road_lines = gpd.read_file(road_axes).geometry.union_all()
         road_buffer = road_lines.buffer(road_width * 0.6)
 
         segments, path_info, graph_data = generate_main_sewer_path_optimized(
@@ -2366,7 +2366,7 @@ class SewerTrisProject:
 
         road_lines = self.state.get("road_lines")
         if road_lines is None:
-            road_lines = gpd.read_file(road_axes).geometry.unary_union
+            road_lines = gpd.read_file(road_axes).geometry.union_all()
         road_buffer = road_lines.buffer(road_width * 0.6)
 
         segments, path_info, graph_data = generate_main_sewer_path_optimized(

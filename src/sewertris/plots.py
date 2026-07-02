@@ -60,8 +60,14 @@ def visualize_results(elevation, slope, flow_dir, mask, boundary_gdf, roads_gdf,
     ax1.plot(outlet_point.x, outlet_point.y, 'y*', markersize=15, label='Outlet')
     ax1.legend()
     
-    # Plot slope with proper coordinates
-    im2 = ax2.imshow(slope, extent=extent, cmap='viridis', origin='upper')
+    # Plot slope with proper coordinates. A few steep boundary/depression
+    # pixels can dominate the scale, so cap vmax at a robust percentile to
+    # keep the gentle interior slopes visible instead of washing out to ~0.
+    smax = np.nanpercentile(slope, 98) if np.isfinite(slope).any() else None
+    im2 = ax2.imshow(
+        slope, extent=extent, cmap='viridis', origin='upper',
+        vmin=0, vmax=(smax if smax and smax > 0 else None),
+    )
     ax2.set_title('Slope (degrees)')
     cbar2 = plt.colorbar(im2, ax=ax2)
     cbar2.set_label('Slope (°)')
@@ -1093,7 +1099,7 @@ def _integrate_flow_volume(df, column, conversion_factor, timestep_seconds=None)
     values = df[column].astype(float).to_numpy()
     elapsed = _flow_duration_seconds(df)
     if elapsed is not None and len(elapsed) == len(values):
-        return float(np.trapz(values, elapsed) * conversion_factor)
+        return float(np.trapezoid(values, elapsed) * conversion_factor)
     if timestep_seconds is None:
         return float(np.nansum(values) * conversion_factor)
     return float(np.nansum(values) * timestep_seconds * conversion_factor)
