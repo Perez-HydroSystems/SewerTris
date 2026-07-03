@@ -41,7 +41,7 @@ SewerTris provides tools to:
 SewerTris follows a structured, twelve-step workflow that defines the complete synthetic sewer modeling pipeline. The framework is designed around a stochastic design philosophy, in which urban layouts and sewer networks are generated through randomized realizations of Tetris-based building blocks. This approach produces ensembles of physically plausible system configurations—referred to as *digital siblings*—that are structurally distinct yet governed by consistent physical and hydraulic rules.
 
 <p align="center">
-  <img src="docs/images/Figure_2.png" width="700">
+  <img src="docs/images/Figure.png" width="700">
 </p>
 
 Hydraulic routing and dynamic flow simulation are performed using the industry-standard **EPA Storm Water Management Model (SWMM)**, fully integrated within the Python workflow. This integration makes SewerTris a self-contained and reproducible modeling environment suitable for benchmarking, sensitivity analysis, and hypothesis testing.
@@ -127,10 +127,10 @@ metadata. A minimal end-to-end run looks like this (simplified — see the noteb
 runnable code):
 
 ```python
-import sewertris as sp
+import sewertris as st
 
 # Create a project (owns its output directory and artifacts)
-project = sp.SewerTrisProject("output_my_project", cell_size_m=100, name="My Project")
+project = st.SewerTrisProject("output_my_project", cell_size_m=100, name="My Project")
 
 # 1–3. Domain definition + stochastic tetris layout
 project.define_domain(domain_mask=mask, cell_size_m=100)
@@ -139,7 +139,7 @@ project.complete_tetris_layout(crs="EPSG:3857", seed=42)
 # 4–7. Roads, land use, synthetic DEM, and the gravity sewer network
 project.generate_roads(road_width=10)
 project.assign_land_use()
-project.generate_topography(config=sp.TopographyConfig())
+project.generate_topography(config=st.TopographyConfig())
 project.generate_sewer_network_V2(road_width=10, block_size=200)
 
 # 8–9. Flow predesign + pipe sizing
@@ -152,7 +152,7 @@ scenario = project.create_run("baseline")
 depths, flows = scenario.run_swmm(monitored_nodes=["OUTLET"], monitored_links=["P_OUTLET"])
 
 # Bonus: animate the whole build (tetris → roads → manholes → sewer) as a GIF
-sp.animate_pipeline(project, out_path=project.path("pipeline.gif"))
+st.animate_pipeline(project, out_path=project.path("pipeline.gif"))
 ```
 
 See the example notebooks in [`Examples/`](Examples/) for complete, runnable workflows.
