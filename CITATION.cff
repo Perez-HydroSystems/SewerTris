@@ -5,6 +5,7 @@ type: software
 version: "1.0.0"
 date-released: 2026-07-03
 license: MIT
+doi: 10.5281/zenodo.21176531
 repository-code: "https://github.com/Perez-HydroSystems/sewertris.git"
 
 authors:

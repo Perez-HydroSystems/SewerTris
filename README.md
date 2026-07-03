@@ -1,4 +1,7 @@
 # SewerTris
+
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21176531.svg)](https://doi.org/10.5281/zenodo.21176531)
+
 **SewerTris** is a Python framework for generating synthetic urban layouts and sanitary sewer networks, and for simulating their hydrologic–hydraulic behavior in EPA-SWMM for controlled experimentation, methodological benchmarking, and sensitivity analysis of sanitary sewer system design and monitoring, supporting research and infrastructure planning.
 
 <p align="center">
@@ -188,11 +191,12 @@ pytest
 If you use SewerTris in academic work, please cite:
 
 ```code
-Blanco, K., & Perez, G. (2026).  
-**SewerTris: Synthetic urban sanitary sewer system generator and EPA-SWMM benchmarking framework**  
+Blanco, K., & Perez, G. (2026).
+SewerTris: Synthetic urban sanitary sewer system generator and EPA-SWMM benchmarking framework (v1.0.0).
+Zenodo. https://doi.org/10.5281/zenodo.21176531
 ```
 
-A DOI will be generated after the first GitHub release via Zenodo.
+DOI (all versions): [10.5281/zenodo.21176531](https://doi.org/10.5281/zenodo.21176531) · DOI (v1.0.0): [10.5281/zenodo.21176532](https://doi.org/10.5281/zenodo.21176532)
 
 ---
 ## 📄 License
