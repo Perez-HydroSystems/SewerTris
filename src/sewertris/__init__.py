@@ -20,6 +20,7 @@ from .roads import *
 from .sewer_network import *
 from .swmm import *
 from .topography import *
+from ._deps import save_vector
 
 
 __version__ = "0.1.0"
@@ -33,6 +34,7 @@ __all__ = [
     "__version__",
     "plots",
     "swmm",
+    "save_vector",
 ]
 
 for _module in (

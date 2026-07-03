@@ -180,7 +180,7 @@ def export_individual_figures_to_shapefile(
         "geometry": geometries
     }, crs=crs)
 
-    gdf.to_file(output_path)
+    save_vector(gdf, output_path)
     print(f"✅ Exported {len(gdf)} figures to {output_path}")
 
 def export_individual_figures_to_shapefile_georeferenced(
@@ -246,7 +246,7 @@ def export_individual_figures_to_shapefile_georeferenced(
         {"figure_id": figure_ids, "tetro_id": tetro_ids, "label": labels, "geometry": geometries},
         crs=crs_out
     )
-    gdf.to_file(output_path)
+    save_vector(gdf, output_path)
     print(f"✅ Exported {len(gdf)} figures to {output_path}")
     return gdf
 

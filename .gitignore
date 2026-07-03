@@ -29,3 +29,7 @@ output_sewertris*/
 sewer_model.out
 sewer_model.rpt
 flows.nc
+
+New_Development/
+example_06_Stillwater_sewer_overflows_project.ipynb
+

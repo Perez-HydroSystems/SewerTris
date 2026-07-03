@@ -1704,10 +1704,10 @@ def update_manhole_elevations_from_dem(
     # 6) Save
     driver = "ESRI Shapefile" if output_path.lower().endswith(".shp") else None
     if driver:
-        mans_out.to_file(output_path, driver=driver)
+        save_vector(mans_out, output_path, driver=driver)
     else:
         # Default to GeoPackage if extension is .gpkg, else let GeoPandas infer
-        mans_out.to_file(output_path)
+        save_vector(mans_out, output_path)
 
     # 7) Quick report
     n_ok = int(np.isfinite(out_vals).sum())

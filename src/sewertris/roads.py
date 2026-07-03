@@ -103,14 +103,14 @@ def extract_boundary(
             boundary_geom = MultiLineString(line_parts)
 
         gdf_lines = gpd.GeoDataFrame({"id": [1]}, geometry=[boundary_geom], crs=crs)
-        gdf_lines.to_file(out_boundary_lines)
+        save_vector(gdf_lines, out_boundary_lines)
         print(f"[OK] Boundary lines written to: {out_boundary_lines}")
 
     # ----- Outer shell polygon(s) only (no holes) -----
     if out_outer_shell_polygon:
         shells = [Polygon(p.exterior) for p in polys]  # drop holes
         gdf_shells = gpd.GeoDataFrame({"id": range(1, len(shells)+1)}, geometry=shells, crs=crs)
-        gdf_shells.to_file(out_outer_shell_polygon)
+        save_vector(gdf_shells, out_outer_shell_polygon)
         print(f"[OK] Outer shell polygon(s) written to: {out_outer_shell_polygon}")
 
     # Return the shapely results in case you want them in-memory
@@ -326,7 +326,7 @@ def export_to_shapefile(blocks, crs, output_path):
         "color": [b.color for b in blocks if b.final_poly],
         "geometry": [b.final_poly for b in blocks if b.final_poly]
     }, crs=crs)
-    gdf.to_file(output_path)
+    save_vector(gdf, output_path)
     print(f"✅ Exported to {output_path}")
     return gdf
 

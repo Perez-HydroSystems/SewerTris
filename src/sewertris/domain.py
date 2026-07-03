@@ -12,7 +12,7 @@ def download_city_boundary(city_name: str, save_path: str = "city_boundary.shp")
     gdf = ox.geocode_to_gdf(city_name)
 
     # Save to shapefile
-    gdf.to_file(save_path)
+    save_vector(gdf, save_path)
     print(f"Shapefile saved to: {save_path}")
 
     return save_path

@@ -67,7 +67,7 @@ def delineate_afferent_areas_and_baseflow(
     output = intersected[[
         'pipe_id', 'type', 'land_use', 'area_ha', 'population', 'base_flow_lps', 'geometry'
     ]]
-    output.to_file(output_path)
+    save_vector(output, output_path)
     print(f"✅ Sub-catchments saved to: {output_path}")
 
 def assign_flow_to_pipes(pipes_path, subcatchments_path, output_path):
@@ -130,7 +130,7 @@ def assign_flow_to_pipes(pipes_path, subcatchments_path, output_path):
     pipes.reset_index(inplace=True)
 
     # Save
-    pipes.to_file(output_path)
+    save_vector(pipes, output_path)
     print(f"✅ Updated pipe shapefile saved: {output_path}")
 
 def assign_flow_to_pipes_fast(pipes_path, subcatchments_path, output_path):
@@ -260,7 +260,7 @@ def assign_flow_to_pipes_fast(pipes_path, subcatchments_path, output_path):
     # -----------------------------
     # Save
     # -----------------------------
-    pipes.to_file(output_path)
+    save_vector(pipes, output_path)
     print(f"✅ Updated pipe file saved: {output_path}")
 
 def compute_gwi_cumulative(
@@ -371,7 +371,7 @@ def compute_gwi_cumulative(
         if out_path.exists() and not overwrite:
             raise FileExistsError(f"{out_path} exists and overwrite=False.")
         # GeoPandas will infer format from extension (.shp, .gpkg, .geojson, …)
-        gdf.to_file(out_path)
+        save_vector(gdf, out_path)
 
     return gdf
 
@@ -474,7 +474,7 @@ def compute_rdii_and_accumulate(
             path = Path(path)
             if path.exists() and not overwrite:
                 raise FileExistsError(f"{path} exists and overwrite=False.")
-            gdf.to_file(path)
+            save_vector(gdf, path)
 
     _write(pipes, out_pipes)
     _write(subs, out_subcatch)

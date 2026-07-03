@@ -10,6 +10,8 @@ import copy
 import json
 import shutil
 
+from ._deps import save_vector
+
 
 _VECTOR_FORMAT_EXTENSIONS = {
     "gpkg": ".gpkg",
@@ -839,7 +841,7 @@ class SewerTrisProject:
             pipes["downstream_m"] = pipes["downstream"]
             changed = True
         if changed:
-            pipes.to_file(self.pipes_path)
+            save_vector(pipes, self.pipes_path)
 
     def remember(self, **items: Any) -> "SewerTrisProject":
         """Store in-memory workflow results on the project object."""
@@ -2065,8 +2067,8 @@ class SewerTrisProject:
 
         import geopandas as gpd
 
-        gpd.GeoDataFrame(geometry=[road_lines], crs=crs).to_file(self.road_centerlines_path)
-        gpd.GeoDataFrame(geometry=[road_buffer], crs=crs).to_file(self.road_polygons_path)
+        save_vector(gpd.GeoDataFrame(geometry=[road_lines], crs=crs), self.road_centerlines_path)
+        save_vector(gpd.GeoDataFrame(geometry=[road_buffer], crs=crs), self.road_polygons_path)
         self.remember(
             road_lines=road_lines,
             road_buffer=road_buffer,
@@ -2541,7 +2543,7 @@ class SewerTrisProject:
         peak_flow, pf = british_columbia_peaking_factor(pipes[flow_col])
         pipes["peaking_factor_bc"] = pf
         pipes["peak_flow_lps_bc"] = peak_flow
-        pipes.to_file(self.pipes_path)
+        save_vector(pipes, self.pipes_path)
 
         compute_gwi_cumulative(
             pipes_path=self.pipes_path,
