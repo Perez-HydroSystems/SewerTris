@@ -173,10 +173,10 @@ def domain_project(tmp_path_factory):
     """Step 1 -- urban domain definition."""
     pytest.importorskip("geopandas")
     pytest.importorskip("rasterio")
-    import sewertris as sp
+    import sewertris as st
 
     out_dir = tmp_path_factory.mktemp("pipeline") / "project"
-    project = sp.SewerTrisProject(out_dir, cell_size_m=CELL_SIZE_M, autosave=False)
+    project = st.SewerTrisProject(out_dir, cell_size_m=CELL_SIZE_M, autosave=False)
     mask, grid_meta = make_domain_mask()
     project.define_domain(domain_mask=mask, cell_size_m=CELL_SIZE_M, grid_meta=grid_meta)
     return project
@@ -185,9 +185,9 @@ def domain_project(tmp_path_factory):
 @pytest.fixture(scope="session")
 def layout_project(domain_project):
     """Steps 2-3 -- tetromino definition + stochastic completion."""
-    import sewertris as sp
+    import sewertris as st
 
-    tetrominoes, colors = sp.get_tetromino_set("full")
+    tetrominoes, colors = st.get_tetromino_set("full")
     domain_project.define_tetrominoes(tetrominoes, colors)
     domain_project.complete_tetris_layout(seed=1000, georeferenced=True)
     return domain_project
@@ -214,9 +214,9 @@ def landuse_project(roads_project):
 @pytest.fixture(scope="session")
 def topo_project(landuse_project):
     """Step 6 -- synthetic DEM generation."""
-    import sewertris as sp
+    import sewertris as st
 
-    config = sp.TopographyConfig(
+    config = st.TopographyConfig(
         min_elevation=270,
         max_elevation=290,
         cell_size=10,

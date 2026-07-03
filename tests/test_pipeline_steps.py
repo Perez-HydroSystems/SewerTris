@@ -45,9 +45,9 @@ def test_step01_define_domain_persists_mask_and_grid(domain_project):
 # ---------------------------------------------------------------------------
 
 def test_step02_full_tetromino_set_has_seven_canonical_pieces():
-    import sewertris as sp
+    import sewertris as st
 
-    tetrominoes, colors = sp.get_tetromino_set("full")
+    tetrominoes, colors = st.get_tetromino_set("full")
     assert {"I", "O", "T", "S", "Z", "J", "L"}.issubset(set(tetrominoes))
     assert set(colors) >= {"I", "O", "T", "S", "Z", "J", "L"}
 

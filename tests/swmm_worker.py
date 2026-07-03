@@ -7,7 +7,7 @@ SRC_DIR = REPO_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-import sewertris as sp
+import sewertris as st
 
 
 def main(inp_path):
@@ -16,7 +16,7 @@ def main(inp_path):
     if inp_path.suffix.lower() != ".inp":
         raise ValueError(f"Input is not an INP file: {inp_path}")
 
-    df = sp.get_flow_components_from_node_pyswmm(
+    df = st.get_flow_components_from_node_pyswmm(
         inp_path=str(inp_path),
         link_id="P_OUTLET"
     )

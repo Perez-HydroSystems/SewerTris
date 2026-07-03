@@ -2,28 +2,28 @@ from __future__ import annotations
 
 
 def test_top_level_api_exports_expected_functions():
-    import sewertris as sp
+    import sewertris as st
 
-    assert callable(sp.build_domain_mask_from_shapefile)
-    assert callable(sp.fill_domain_with_tetrominoes_and_blocks)
-    assert callable(sp.get_tetromino_set)
-    assert callable(sp.generate_road_network_from_blocks)
-    assert callable(sp.generate_topography)
-    assert callable(sp.export_swmm_inp)
-    assert callable(sp.plot_domain_mask)
-    assert callable(sp.plot_two_models)
-    assert hasattr(sp, "TopographyConfig")
-    assert hasattr(sp, "SewerTrisProject")
-    assert sp.build_domain_mask_from_shapefile.__module__ == "sewertris.domain"
-    assert sp.export_swmm_inp.__module__ == "sewertris.swmm"
-    assert sp.plot_domain_mask.__module__ == "sewertris.plots"
-    assert sp.plot_two_models.__module__ == "sewertris.plots"
+    assert callable(st.build_domain_mask_from_shapefile)
+    assert callable(st.fill_domain_with_tetrominoes_and_blocks)
+    assert callable(st.get_tetromino_set)
+    assert callable(st.generate_road_network_from_blocks)
+    assert callable(st.generate_topography)
+    assert callable(st.export_swmm_inp)
+    assert callable(st.plot_domain_mask)
+    assert callable(st.plot_two_models)
+    assert hasattr(st, "TopographyConfig")
+    assert hasattr(st, "SewerTrisProject")
+    assert st.build_domain_mask_from_shapefile.__module__ == "sewertris.domain"
+    assert st.export_swmm_inp.__module__ == "sewertris.swmm"
+    assert st.plot_domain_mask.__module__ == "sewertris.plots"
+    assert st.plot_two_models.__module__ == "sewertris.plots"
 
 
 def test_named_tetromino_set_helper_returns_four_piece_sibling():
-    import sewertris as sp
+    import sewertris as st
 
-    tetrominoes, colors = sp.get_tetromino_set("I_O_T_S_only")
+    tetrominoes, colors = st.get_tetromino_set("I_O_T_S_only")
 
     assert list(tetrominoes) == ["I", "O", "T", "S"]
     assert set(colors) == {"I", "O", "T", "S"}
@@ -36,10 +36,10 @@ def test_plot_two_models_compares_project_domain_masks(tmp_path):
     matplotlib.use("Agg", force=True)
     import matplotlib.pyplot as plt
     import numpy as np
-    import sewertris as sp
+    import sewertris as st
 
-    project1 = sp.SewerTrisProject(tmp_path / "project1", autosave=False)
-    project2 = sp.SewerTrisProject(tmp_path / "project2", autosave=False)
+    project1 = st.SewerTrisProject(tmp_path / "project1", autosave=False)
+    project2 = st.SewerTrisProject(tmp_path / "project2", autosave=False)
     grid_meta = {
         "crs_out": "EPSG:3857",
         "origin_x": 0,
@@ -60,7 +60,7 @@ def test_plot_two_models_compares_project_domain_masks(tmp_path):
         grid_meta=grid_meta,
     )
 
-    fig = sp.plot_two_models(
+    fig = st.plot_two_models(
         "domain_mask",
         project1,
         project2,
@@ -81,7 +81,7 @@ def test_plot_ensemble_results_summarizes_flow_components(tmp_path):
     matplotlib.use("Agg", force=True)
     import matplotlib.pyplot as plt
     import pandas as pd
-    import sewertris as sp
+    import sewertris as st
 
     times = pd.date_range("1990-01-01", periods=3, freq="h")
     rows = []
@@ -109,14 +109,14 @@ def test_plot_ensemble_results_summarizes_flow_components(tmp_path):
             }
         )
 
-    fig, summary = sp.plot_ensemble_results(
+    fig, summary = st.plot_ensemble_results(
         pd.DataFrame(rows),
         group_cols=("base_model", "ensemble"),
         show=False,
         return_summary=True,
     )
 
-    assert callable(sp.plot_ensemble_results)
+    assert callable(st.plot_ensemble_results)
     assert len(fig.axes) == 10
     assert set(summary["component"]) == {"BWF / DWF", "GWI", "RDII"}
     assert len(summary) == 9
@@ -127,16 +127,16 @@ def test_plot_ensemble_results_summarizes_flow_components(tmp_path):
 
 
 def test_submodule_api_remains_available():
-    import sewertris as sp
+    import sewertris as st
 
-    assert callable(sp.plots.plot_flow_components_v2)
-    assert callable(sp.plots.plot_ensemble_results)
-    assert callable(sp.swmm.assign_inflow_from_pipe_length)
+    assert callable(st.plots.plot_flow_components_v2)
+    assert callable(st.plots.plot_ensemble_results)
+    assert callable(st.swmm.assign_inflow_from_pipe_length)
 
 
 def test_complete_tetris_layout_seed_is_reproducible(monkeypatch, tmp_path):
     import numpy as np
-    import sewertris as sp
+    import sewertris as st
     import sewertris.layout as layout
 
     monkeypatch.setattr(
@@ -145,8 +145,8 @@ def test_complete_tetris_layout_seed_is_reproducible(monkeypatch, tmp_path):
         lambda **kwargs: None,
     )
 
-    project = sp.SewerTrisProject(tmp_path / "project", cell_size_m=100, autosave=False)
-    tetrominoes, _ = sp.get_tetromino_set("I_O_T_S_only")
+    project = st.SewerTrisProject(tmp_path / "project", cell_size_m=100, autosave=False)
+    tetrominoes, _ = st.get_tetromino_set("I_O_T_S_only")
     original_rotation_ids = {
         key: [id(rotation) for rotation in rotations]
         for key, rotations in tetrominoes.items()
@@ -168,9 +168,9 @@ def test_complete_tetris_layout_seed_is_reproducible(monkeypatch, tmp_path):
 def test_project_saves_loads_json_metadata(tmp_path):
     import json
     import numpy as np
-    import sewertris as sp
+    import sewertris as st
 
-    project = sp.SewerTrisProject(
+    project = st.SewerTrisProject(
         tmp_path / "project",
         cell_size_m=100,
         name="Example Project",
@@ -214,7 +214,7 @@ def test_project_saves_loads_json_metadata(tmp_path):
         "sewer_pipes.gpkg"
     )
 
-    loaded = sp.SewerTrisProject.load(project.output_dir)
+    loaded = st.SewerTrisProject.load(project.output_dir)
     assert loaded.output_dir == project.output_dir
     assert loaded.cell_size_m == 100
     assert "test_step" in loaded.metadata["steps"]
@@ -224,7 +224,7 @@ def test_project_saves_loads_json_metadata(tmp_path):
 
 def test_project_load_resolves_legacy_relative_output_dir_to_project_file_parent(tmp_path):
     import json
-    import sewertris as sp
+    import sewertris as st
 
     project_dir = tmp_path / "examples" / "output_example_2_project"
     project_dir.mkdir(parents=True)
@@ -242,7 +242,7 @@ def test_project_load_resolves_legacy_relative_output_dir_to_project_file_parent
         )
     )
 
-    loaded = sp.SewerTrisProject.load(project_file)
+    loaded = st.SewerTrisProject.load(project_file)
 
     assert loaded.output_dir == project_dir
     assert loaded.project_file == project_file
@@ -250,19 +250,19 @@ def test_project_load_resolves_legacy_relative_output_dir_to_project_file_parent
 
 
 def test_project_creates_scenario_folder_without_base_inp(tmp_path):
-    import sewertris as sp
+    import sewertris as st
 
-    project = sp.SewerTrisProject(tmp_path / "project", autosave=False)
+    project = st.SewerTrisProject(tmp_path / "project", autosave=False)
     scenario = project.create_run("bwf_pattern_a", copy_base_inp=False)
 
-    assert isinstance(scenario, sp.SewerTrisScenario)
+    assert isinstance(scenario, st.SewerTrisScenario)
     assert scenario.output_dir.exists()
     assert scenario.swmm_inp_path.name == "sewer_model.inp"
 
     scenario.record_step("assign_dwf_patterns", parameters={"hourly_id": "1"})
     project.save()
 
-    loaded = sp.SewerTrisProject.load(project.project_file)
+    loaded = st.SewerTrisProject.load(project.project_file)
     assert "bwf_pattern_a" in loaded.metadata["scenarios"]
     assert (
         "assign_dwf_patterns"
@@ -272,9 +272,9 @@ def test_project_creates_scenario_folder_without_base_inp(tmp_path):
 
 def test_project_clone_sibling_copies_reusable_domain_state(tmp_path):
     import numpy as np
-    import sewertris as sp
+    import sewertris as st
 
-    base = sp.SewerTrisProject(
+    base = st.SewerTrisProject(
         tmp_path / "base",
         cell_size_m=100,
         name="Base Project",
@@ -310,14 +310,14 @@ def test_project_clone_sibling_copies_reusable_domain_state(tmp_path):
     assert sibling.metadata["lineage"]["rerun_from"] == "02_tetris_block_definition"
     assert "domain_mask" in sibling.metadata["lineage"]["copied_artifacts"]
 
-    loaded = sp.SewerTrisProject.load(sibling.project_file)
+    loaded = st.SewerTrisProject.load(sibling.project_file)
     assert loaded.state["domain_mask"].shape == (2, 2)
 
 
 def test_sibling_replay_applies_road_width_change(monkeypatch, tmp_path):
-    import sewertris as sp
+    import sewertris as st
 
-    base = sp.SewerTrisProject(tmp_path / "base", cell_size_m=100, autosave=False)
+    base = st.SewerTrisProject(tmp_path / "base", cell_size_m=100, autosave=False)
     base.record_step(
         "04_road_network_extraction",
         parameters={"road_width": 10, "simplify_tol": 0.5},
@@ -401,16 +401,16 @@ def test_sibling_replay_applies_road_width_change(monkeypatch, tmp_path):
         calls["scenario_name"] = name
         return FakeScenario(self, name)
 
-    monkeypatch.setattr(sp.SewerTrisProject, "generate_roads", fake_generate_roads)
-    monkeypatch.setattr(sp.SewerTrisProject, "extract_road_boundaries", fake_extract_road_boundaries)
-    monkeypatch.setattr(sp.SewerTrisProject, "assign_land_use", fake_assign_land_use)
-    monkeypatch.setattr(sp.SewerTrisProject, "generate_topography", fake_generate_topography)
-    monkeypatch.setattr(sp.SewerTrisProject, "generate_sewer_network", fake_generate_sewer_network)
-    monkeypatch.setattr(sp.SewerTrisProject, "embed_sewer_network_in_dem", fake_embed)
-    monkeypatch.setattr(sp.SewerTrisProject, "predesign_flows", fake_predesign)
-    monkeypatch.setattr(sp.SewerTrisProject, "design_pipes", fake_design)
-    monkeypatch.setattr(sp.SewerTrisProject, "export_swmm", fake_export_swmm)
-    monkeypatch.setattr(sp.SewerTrisProject, "create_run", fake_create_run)
+    monkeypatch.setattr(st.SewerTrisProject, "generate_roads", fake_generate_roads)
+    monkeypatch.setattr(st.SewerTrisProject, "extract_road_boundaries", fake_extract_road_boundaries)
+    monkeypatch.setattr(st.SewerTrisProject, "assign_land_use", fake_assign_land_use)
+    monkeypatch.setattr(st.SewerTrisProject, "generate_topography", fake_generate_topography)
+    monkeypatch.setattr(st.SewerTrisProject, "generate_sewer_network", fake_generate_sewer_network)
+    monkeypatch.setattr(st.SewerTrisProject, "embed_sewer_network_in_dem", fake_embed)
+    monkeypatch.setattr(st.SewerTrisProject, "predesign_flows", fake_predesign)
+    monkeypatch.setattr(st.SewerTrisProject, "design_pipes", fake_design)
+    monkeypatch.setattr(st.SewerTrisProject, "export_swmm", fake_export_swmm)
+    monkeypatch.setattr(st.SewerTrisProject, "create_run", fake_create_run)
 
     sibling = base.clone_sibling(
         tmp_path / "sibling",
@@ -426,9 +426,9 @@ def test_sibling_replay_applies_road_width_change(monkeypatch, tmp_path):
 
 
 def test_sibling_replay_applies_design_and_scenario_changes(monkeypatch, tmp_path):
-    import sewertris as sp
+    import sewertris as st
 
-    base = sp.SewerTrisProject(tmp_path / "base", cell_size_m=100, autosave=False)
+    base = st.SewerTrisProject(tmp_path / "base", cell_size_m=100, autosave=False)
     base.record_step(
         "09_pipe_sizing_and_hydraulic_properties",
         parameters={
@@ -491,9 +491,9 @@ def test_sibling_replay_applies_design_and_scenario_changes(monkeypatch, tmp_pat
         calls["scenario_name"] = name
         return FakeScenario(self, name)
 
-    monkeypatch.setattr(sp.SewerTrisProject, "design_pipes", fake_design)
-    monkeypatch.setattr(sp.SewerTrisProject, "export_swmm", fake_export_swmm)
-    monkeypatch.setattr(sp.SewerTrisProject, "create_run", fake_create_run)
+    monkeypatch.setattr(st.SewerTrisProject, "design_pipes", fake_design)
+    monkeypatch.setattr(st.SewerTrisProject, "export_swmm", fake_export_swmm)
+    monkeypatch.setattr(st.SewerTrisProject, "create_run", fake_create_run)
 
     hourly = [1.2] * 24
     rainfall = [["1/1/1990", "00:00", 1.5]]
@@ -523,9 +523,9 @@ def test_sibling_replay_applies_design_and_scenario_changes(monkeypatch, tmp_pat
 
 
 def test_sibling_replay_applies_gwi_and_rdii_rasters(monkeypatch, tmp_path):
-    import sewertris as sp
+    import sewertris as st
 
-    base = sp.SewerTrisProject(tmp_path / "base", cell_size_m=100, autosave=False)
+    base = st.SewerTrisProject(tmp_path / "base", cell_size_m=100, autosave=False)
     base.record_step(
         "10_dynamic_flow_input_definition_base_model",
         parameters={
@@ -571,24 +571,24 @@ def test_sibling_replay_applies_gwi_and_rdii_rasters(monkeypatch, tmp_path):
     def fake_add_subcatchment_rdii_raster(self, **kwargs):
         calls["rdii_raster"] = kwargs
 
-    monkeypatch.setattr(sp.SewerTrisProject, "export_swmm", fake_export_swmm)
+    monkeypatch.setattr(st.SewerTrisProject, "export_swmm", fake_export_swmm)
     monkeypatch.setattr(
-        sp.SewerTrisScenario,
+        st.SewerTrisScenario,
         "assign_gwi_from_pipe_length",
         fake_assign_gwi_from_pipe_length,
     )
     monkeypatch.setattr(
-        sp.SewerTrisScenario,
+        st.SewerTrisScenario,
         "assign_gwi_from_raster",
         fake_assign_gwi_from_raster,
     )
     monkeypatch.setattr(
-        sp.SewerTrisScenario,
+        st.SewerTrisScenario,
         "add_subcatchment_rdii",
         fake_add_subcatchment_rdii,
     )
     monkeypatch.setattr(
-        sp.SewerTrisScenario,
+        st.SewerTrisScenario,
         "add_subcatchment_rdii_raster",
         fake_add_subcatchment_rdii_raster,
     )
@@ -628,9 +628,9 @@ def test_sibling_replay_applies_gwi_and_rdii_rasters(monkeypatch, tmp_path):
 
 
 def test_sibling_replay_generated_rdii_raster_sets_density_scale(monkeypatch, tmp_path):
-    import sewertris as sp
+    import sewertris as st
 
-    base = sp.SewerTrisProject(tmp_path / "base", cell_size_m=100, autosave=False)
+    base = st.SewerTrisProject(tmp_path / "base", cell_size_m=100, autosave=False)
     base.record_step(
         "10_dynamic_flow_input_definition_base_model",
         parameters={
@@ -666,15 +666,15 @@ def test_sibling_replay_generated_rdii_raster_sets_density_scale(monkeypatch, tm
     def fake_add_subcatchment_rdii_raster(self, **kwargs):
         calls["rdii_raster"] = kwargs
 
-    monkeypatch.setattr(sp.SewerTrisProject, "export_swmm", fake_export_swmm)
+    monkeypatch.setattr(st.SewerTrisProject, "export_swmm", fake_export_swmm)
     monkeypatch.setattr(
-        sp.SewerTrisProject,
+        st.SewerTrisProject,
         "generate_rdii_density_raster",
         fake_generate_rdii_density_raster,
     )
-    monkeypatch.setattr(sp.SewerTrisScenario, "assign_gwi_from_pipe_length", lambda *a, **k: None)
+    monkeypatch.setattr(st.SewerTrisScenario, "assign_gwi_from_pipe_length", lambda *a, **k: None)
     monkeypatch.setattr(
-        sp.SewerTrisScenario,
+        st.SewerTrisScenario,
         "add_subcatchment_rdii_raster",
         fake_add_subcatchment_rdii_raster,
     )
@@ -722,9 +722,9 @@ def test_project_patches_downstream_alias_before_predesign(monkeypatch, tmp_path
 
     gpd = pytest.importorskip("geopandas")
     from shapely.geometry import LineString, Point, Polygon
-    import sewertris as sp
+    import sewertris as st
 
-    project = sp.SewerTrisProject(tmp_path / "project", autosave=False)
+    project = st.SewerTrisProject(tmp_path / "project", autosave=False)
     gpd.GeoDataFrame(
         {"land_use": ["RESIDENTIAL"]},
         geometry=[Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])],

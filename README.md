@@ -127,10 +127,10 @@ metadata. A minimal end-to-end run looks like this (simplified — see the noteb
 runnable code):
 
 ```python
-import sewertris as sp
+import sewertris as st
 
 # Create a project (owns its output directory and artifacts)
-project = sp.SewerTrisProject("output_my_project", cell_size_m=100, name="My Project")
+project = st.SewerTrisProject("output_my_project", cell_size_m=100, name="My Project")
 
 # 1–3. Domain definition + stochastic tetris layout
 project.define_domain(domain_mask=mask, cell_size_m=100)
@@ -139,7 +139,7 @@ project.complete_tetris_layout(crs="EPSG:3857", seed=42)
 # 4–7. Roads, land use, synthetic DEM, and the gravity sewer network
 project.generate_roads(road_width=10)
 project.assign_land_use()
-project.generate_topography(config=sp.TopographyConfig())
+project.generate_topography(config=st.TopographyConfig())
 project.generate_sewer_network_V2(road_width=10, block_size=200)
 
 # 8–9. Flow predesign + pipe sizing
@@ -152,7 +152,7 @@ scenario = project.create_run("baseline")
 depths, flows = scenario.run_swmm(monitored_nodes=["OUTLET"], monitored_links=["P_OUTLET"])
 
 # Bonus: animate the whole build (tetris → roads → manholes → sewer) as a GIF
-sp.animate_pipeline(project, out_path=project.path("pipeline.gif"))
+st.animate_pipeline(project, out_path=project.path("pipeline.gif"))
 ```
 
 See the example notebooks in [`Examples/`](Examples/) for complete, runnable workflows.
