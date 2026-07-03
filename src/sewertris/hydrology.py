@@ -36,7 +36,7 @@ def delineate_afferent_areas_and_baseflow(
 
     # Voronoi polygons
     points = MultiPoint(midpoints.geometry.tolist())
-    envelope = blocks.unary_union.envelope.buffer(100)
+    envelope = blocks.union_all().envelope.buffer(100)
     vor = voronoi_diagram(points, envelope=envelope)
     voronoi_polygons = gpd.GeoDataFrame(geometry=[p for p in vor.geoms], crs=blocks.crs)
 
@@ -67,7 +67,7 @@ def delineate_afferent_areas_and_baseflow(
     output = intersected[[
         'pipe_id', 'type', 'land_use', 'area_ha', 'population', 'base_flow_lps', 'geometry'
     ]]
-    output.to_file(output_path)
+    save_vector(output, output_path)
     print(f"✅ Sub-catchments saved to: {output_path}")
 
 def assign_flow_to_pipes(pipes_path, subcatchments_path, output_path):
@@ -130,7 +130,7 @@ def assign_flow_to_pipes(pipes_path, subcatchments_path, output_path):
     pipes.reset_index(inplace=True)
 
     # Save
-    pipes.to_file(output_path)
+    save_vector(pipes, output_path)
     print(f"✅ Updated pipe shapefile saved: {output_path}")
 
 def assign_flow_to_pipes_fast(pipes_path, subcatchments_path, output_path):
@@ -260,7 +260,7 @@ def assign_flow_to_pipes_fast(pipes_path, subcatchments_path, output_path):
     # -----------------------------
     # Save
     # -----------------------------
-    pipes.to_file(output_path)
+    save_vector(pipes, output_path)
     print(f"✅ Updated pipe file saved: {output_path}")
 
 def compute_gwi_cumulative(
@@ -371,7 +371,7 @@ def compute_gwi_cumulative(
         if out_path.exists() and not overwrite:
             raise FileExistsError(f"{out_path} exists and overwrite=False.")
         # GeoPandas will infer format from extension (.shp, .gpkg, .geojson, …)
-        gdf.to_file(out_path)
+        save_vector(gdf, out_path)
 
     return gdf
 
@@ -474,7 +474,7 @@ def compute_rdii_and_accumulate(
             path = Path(path)
             if path.exists() and not overwrite:
                 raise FileExistsError(f"{path} exists and overwrite=False.")
-            gdf.to_file(path)
+            save_vector(gdf, path)
 
     _write(pipes, out_pipes)
     _write(subs, out_subcatch)
@@ -1067,7 +1067,7 @@ def create_building_density_raster(boundary_path, output_raster, resolution=100.
 
     # 3. Download buildings from OSM using polygon (NOT Edmond)
     try:
-        boundary_poly_wgs84 = boundary_wgs84.unary_union
+        boundary_poly_wgs84 = boundary_wgs84.union_all()
         print("Querying OSM for buildings within boundary polygon...")
         buildings = ox.features_from_polygon(
             boundary_poly_wgs84,
@@ -1155,7 +1155,7 @@ def create_building_density_raster(boundary_path, output_raster, resolution=100.
     density = building_count / pixel_area_sq_km
 
     # 8. Apply boundary mask so values outside are set to 0
-    boundary_geom_proj = boundary_proj.unary_union
+    boundary_geom_proj = boundary_proj.union_all()
     boundary_mask = rasterize(
         [(boundary_geom_proj, 1)],
         out_shape=(height, width),

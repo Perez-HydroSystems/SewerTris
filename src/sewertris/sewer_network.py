@@ -66,7 +66,7 @@ def export_manholes_to_shapefile(manholes, output_path, crs):
         'geometry': [mh['location'] for mh in manholes]
     }, crs=crs)
 
-    gdf.to_file(output_path)
+    save_vector(gdf, output_path)
     print(f"✅ Manholes exported to {output_path}")
 
 def generate_main_sewer_path(
@@ -462,7 +462,7 @@ def export_pipes_to_shapefile(pipes_main, pipes_sec, pipes_ter, manholes, output
 
     all_records = rec_main + rec_sec + rec_ter
     gdf = gpd.GeoDataFrame(all_records, crs=crs)
-    gdf.to_file(output_path)
+    save_vector(gdf, output_path)
 
     print(f"✅ Exported {len(all_records)} pipes to: {output_path} with CRS: {crs}")
 
@@ -687,7 +687,7 @@ def export_tertiary_pipes_to_shapefile(manholes, tertiary_pipes, output_path, cr
     gdf = gpd.GeoDataFrame(records, crs=crs)
     
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    gdf.to_file(output_path)
+    save_vector(gdf, output_path)
     print(f"✅ Tertiary pipes exported to: {output_path}")
 
 def prepare_sewer_nodes(manholes):
@@ -2580,7 +2580,7 @@ def export_pipes_to_shapefile_2(
     gdf = gpd.GeoDataFrame(df, geometry="geometry", crs=crs)
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    gdf.to_file(output_path)
+    save_vector(gdf, output_path)
 
     print(f"✅ Exported {len(all_records)} pipes to: {output_path}")
     print(f"   Main: {len(rec_main)} | Secondary: {len(rec_sec)} | Tertiary: {len(rec_ter)}")

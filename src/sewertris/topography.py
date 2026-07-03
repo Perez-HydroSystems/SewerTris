@@ -315,9 +315,10 @@ def validate_drainage(elevation, xx, yy, mask, outlet_point):
     """
     Validate that water can drain from all points to the outlet
     """
-    # Calculate slopes
+    # Calculate slopes. np.gradient returns rise/run (a dimensionless tangent);
+    # convert to degrees so it matches the "Slope (degrees)" plot/labels.
     dy, dx = np.gradient(elevation, yy[:,0], xx[0,:])
-    slope = np.sqrt(dx**2 + dy**2)
+    slope = np.degrees(np.arctan(np.sqrt(dx**2 + dy**2)))
     
     # Flow direction (D8 algorithm simplified)
     flow_dir = np.zeros_like(elevation)
@@ -459,9 +460,9 @@ def modify_topography_with_sewers(
 
     # Merge small multipart pieces if present (optional, helps continuity)
     try:
-        sewer_geom = linemerge(sewer_gdf.geometry.unary_union)
+        sewer_geom = linemerge(sewer_gdf.geometry.union_all())
     except Exception:
-        sewer_geom = sewer_gdf.geometry.unary_union
+        sewer_geom = sewer_gdf.geometry.union_all()
 
     # Normalize to a list of LineStrings
     raw_lines = list(_iter_lines(sewer_geom))
@@ -1703,10 +1704,10 @@ def update_manhole_elevations_from_dem(
     # 6) Save
     driver = "ESRI Shapefile" if output_path.lower().endswith(".shp") else None
     if driver:
-        mans_out.to_file(output_path, driver=driver)
+        save_vector(mans_out, output_path, driver=driver)
     else:
         # Default to GeoPackage if extension is .gpkg, else let GeoPandas infer
-        mans_out.to_file(output_path)
+        save_vector(mans_out, output_path)
 
     # 7) Quick report
     n_ok = int(np.isfinite(out_vals).sum())

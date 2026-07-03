@@ -16,6 +16,7 @@ import math
 import os
 import random
 import sys
+import warnings
 
 _CACHE_ROOT = Path(__file__).resolve().parents[2] / ".sewertris_cache"
 _MPL_CACHE_DIR = _CACHE_ROOT / "matplotlib"
@@ -149,6 +150,29 @@ try:
     from shapely.validation import make_valid
 except Exception:  # pragma: no cover
     make_valid = None
+
+
+def save_vector(gdf, path, **kwargs):
+    """Write a GeoDataFrame to *path*, silencing harmless ESRI Shapefile warnings.
+
+    Shapefiles cap field names at 10 characters, so columns such as
+    ``downstream_m`` are silently truncated (to ``downstream``) on write.
+    SewerTris expects this and restores the full names on read via
+    :func:`ensure_pipe_topology_aliases`, so the resulting geopandas truncation
+    warning and the pyogrio ``Normalized/laundered field name`` warning are pure
+    noise. This wrapper filters those two specific messages and leaves every
+    other warning untouched.
+    """
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message="Column names longer than 10 characters",
+        )
+        warnings.filterwarnings(
+            "ignore",
+            message="Normalized/laundered field name",
+        )
+        gdf.to_file(path, **kwargs)
 
 
 def ensure_pipe_topology_aliases(gdf):

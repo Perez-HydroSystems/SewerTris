@@ -41,47 +41,47 @@ SewerTris provides tools to:
 SewerTris follows a structured, twelve-step workflow that defines the complete synthetic sewer modeling pipeline. The framework is designed around a stochastic design philosophy, in which urban layouts and sewer networks are generated through randomized realizations of Tetris-based building blocks. This approach produces ensembles of physically plausible system configurations—referred to as *digital siblings*—that are structurally distinct yet governed by consistent physical and hydraulic rules.
 
 <p align="center">
-  <img src="docs/images/figure_2.png" width="700">
+  <img src="docs/images/Figure_2.png" width="700">
 </p>
 
 Hydraulic routing and dynamic flow simulation are performed using the industry-standard **EPA Storm Water Management Model (SWMM)**, fully integrated within the Python workflow. This integration makes SewerTris a self-contained and reproducible modeling environment suitable for benchmarking, sensitivity analysis, and hypothesis testing.
 
 Below is a conceptual overview of the twelve modeling components:
 
-### 1. Urban Domain Definition
+### 1. Urban Boundary
 Defines the spatial modeling boundary using a vector polygon or raster mask and establishes the sewer outlet location.
 
-### 2. Tetris Block Definition
-Specifies modular tetromino building blocks (I, L, T, S, Z shapes) that form the geometric basis of the synthetic urban layout.
+### 2. Tetris Block Elements
+Specifies modular tetromino building blocks (i.e. I, O, T, J, S shapes) that form the geometric basis of the synthetic urban layout.
 
-### 3. Stochastic Tetris Completion
+### 3. Tetris Completion
 Populates the domain using randomized block placement to generate heterogeneous but coherent urban configurations.
 
-### 4. Road Network Extraction
+### 4. Road Network
 Derives a synthetic road network from block boundaries, ensuring topological consistency with urban structure.
 
-### 5. Land-Use Assignment
+### 5. Land Use
 Assigns residential, commercial, industrial, public, and recreational land uses using rule-based or user-defined allocation strategies.
 
-### 6. Synthetic DEM Generation
+### 6. Synthetic DEM
 Creates a hydraulically consistent Digital Elevation Model (DEM) enforcing global drainage toward the outlet.
 
-### 7. Sewer Network Generation
+### 7. Sewer Network Topology
 Constructs a gravity-driven, tree-structured sewer network aligned with roads and embedded within the DEM.
 
-### 8. Sewer Flow Predesign
+### 8. Flow Predesign
 Computes baseline peak discharges combining Dry-Weather Flow (DWF), Groundwater Infiltration (GWI), and Rainfall-Derived Inflow & Infiltration (RDII).
 
 ### 9. Pipe Sizing and Hydraulic Properties
 Assigns pipe diameters, roughness, and invert elevations using Manning-based design principles.
 
-### 10. Dynamic Flow Input Definition
+### 10. Dynamic Flow Inputs
 Specifies temporally resolved DWF, GWI, and RDII inputs, including rainfall forcing and spatial heterogeneity options.
 
-### 11. EPA-SWMM Simulation
+### 11. Hydrodinamics Simulations
 Performs unsteady hydraulic routing and enables component tagging (RAIN and DRY) for flow separation analysis.
 
-### 12. Flow Output Decomposition
+### 12. Sewage Flow Outputs
 Extracts and decomposes total flows into DWF, RDII, and residual GWI components for benchmarking and diagnostics.
 
 ---

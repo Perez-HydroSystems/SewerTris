@@ -79,7 +79,7 @@ def assign_pipe_slopes(pipes_path, manholes_path, output_path, minimum_slope=0.0
     pipes["slope_flag"] = pipes["slope_raw"] < minimum_slope
 
     # Save to file
-    pipes.to_file(output_path)
+    save_vector(pipes, output_path)
     print(f"✅ Pipe slopes assigned and saved to: {output_path}")
 
 def assign_material_diameter_to_pipes(
@@ -214,7 +214,7 @@ def assign_material_diameter_to_pipes(
 
     # ------------------------- Output -------------------------
     if output_path:
-        gdf.to_file(output_path)
+        save_vector(gdf, output_path)
         print(f"✅ Materials and diameters assigned and saved to: {output_path}")
 
     if return_gdf:
@@ -307,7 +307,7 @@ def assign_invert_elevations(
     pipes["inv_down"] = pipes["pipe_id"].map(lambda pid: inv_results.get(pid, (np.nan, np.nan))[1])
 
     # Save output
-    pipes.to_file(output_path)
+    save_vector(pipes, output_path)
     print(f"✅ Invert elevations assigned and saved to: {output_path}")
 
 def preprocess_pipes_and_manholes(pipes_path, manholes_path, output_pipes_path, output_manholes_path):
@@ -348,8 +348,8 @@ def preprocess_pipes_and_manholes(pipes_path, manholes_path, output_pipes_path, 
     manholes_clean = manholes_clean.drop_duplicates(subset="id")
 
     # Save cleaned files
-    pipes_clean.to_file(output_pipes_path)
-    manholes_clean.to_file(output_manholes_path)
+    save_vector(pipes_clean, output_pipes_path)
+    save_vector(manholes_clean, output_manholes_path)
 
     print(f"✅ Pipes saved to: {output_pipes_path}")
     print(f"✅ Manholes saved to: {output_manholes_path}")
@@ -422,7 +422,7 @@ def add_predesign_flow(pipes_path: str, out_path: str | None = None, overwrite: 
         out_path = pathlib.Path(out_path)
         if out_path.exists() and not overwrite:
             raise FileExistsError(f"{out_path} exists and overwrite=False.")
-        gdf.to_file(out_path)
+        save_vector(gdf, out_path)
 
     return gdf
 
