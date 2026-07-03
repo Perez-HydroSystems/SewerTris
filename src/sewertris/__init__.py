@@ -23,7 +23,7 @@ from .topography import *
 from ._deps import save_vector
 
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"
 
 __all__ = [
     "SewerTrisProject",

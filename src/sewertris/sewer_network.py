@@ -196,7 +196,7 @@ def generate_main_sewer_path(
             base_cost = dist
             # slope bonus (bigger slope → smaller cost)
             # normalize slope to something reasonable
-            slope_bonus = (1.0 - prefer_slope * max(0.0, slope))  # shrink cost if slope>0
+            slope_bonus = max(0.05, 1.0 - prefer_slope * max(0.0, slope))  # shrink cost if slope>0 (keep positive)
             cost = base_cost * slope_bonus
 
             # add undirected (or directed?) -- sewer is directional, so we can add directed
@@ -366,7 +366,7 @@ def generate_secondary_pipes(manholes, main_path, road_buffer, block_size=40.0, 
     return secondary_pipes
 
 def remove_secondary_pipes_overlapping_main(manholes, secondary_pipes, main_pipes, tolerance=0.01):
-    from shapely.geometry import LineString
+    from shapely.geometry import LineString, Point
     from shapely.strtree import STRtree
 
     id_map = {mh['id']: mh for mh in manholes}
@@ -385,9 +385,9 @@ def remove_secondary_pipes_overlapping_main(manholes, secondary_pipes, main_pipe
 
         overlap = False
 
-        for seg in main_tree.query(line):
-            if not isinstance(seg, LineString):
-                continue
+        for idx in main_tree.query(line):
+            # Shapely 2.x STRtree.query returns integer indices, not geometries.
+            seg = main_lines[idx]
 
             if not line.intersects(seg):
                 continue
@@ -396,18 +396,21 @@ def remove_secondary_pipes_overlapping_main(manholes, secondary_pipes, main_pipe
             if intersection.is_empty:
                 continue
 
+            seg_start = Point(seg.coords[0])
+            seg_end = Point(seg.coords[-1])
+
             # Allow touching only at endpoints
             if intersection.geom_type == "Point":
                 if intersection.equals(p0) or intersection.equals(p1) or \
-                   intersection.equals(seg.boundary[0]) or intersection.equals(seg.boundary[1]):
+                   intersection.equals(seg_start) or intersection.equals(seg_end):
                     continue
                 else:
                     overlap = True
                     break
 
             elif intersection.geom_type == "MultiPoint":
-                if all(pt.equals(p0) or pt.equals(p1) or 
-                       pt.equals(seg.boundary[0]) or pt.equals(seg.boundary[1]) 
+                if all(pt.equals(p0) or pt.equals(p1) or
+                       pt.equals(seg_start) or pt.equals(seg_end)
                        for pt in intersection.geoms):
                     continue
                 else:
@@ -686,7 +689,7 @@ def export_tertiary_pipes_to_shapefile(manholes, tertiary_pipes, output_path, cr
 
     gdf = gpd.GeoDataFrame(records, crs=crs)
     
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
     save_vector(gdf, output_path)
     print(f"✅ Tertiary pipes exported to: {output_path}")
 
@@ -901,7 +904,7 @@ def build_main_candidate_graph(
                 continue
 
             # Cost function: short + favorable slope
-            slope_bonus = 1.0 - prefer_slope * max(0.0, slope)
+            slope_bonus = max(0.05, 1.0 - prefer_slope * max(0.0, slope))
             cost = dist * slope_bonus
 
             rows.append(i)
@@ -1362,7 +1365,7 @@ def build_secondary_candidate_edges(
             if overlaps_main_path(line):
                 continue
 
-            slope_bonus = 1.0 - prefer_slope * max(0.0, slope)
+            slope_bonus = max(0.05, 1.0 - prefer_slope * max(0.0, slope))
             cost = dist * slope_bonus
 
             candidates_for_src.append({
@@ -2443,7 +2446,7 @@ def export_pipes_to_shapefile_2(
     pipe_id       : unique pipe ID
     upstream_m    : upstream manhole ID
     downstream_m  : downstream manhole ID
-    ptype         : main / secondary / tertiary
+    type          : main / secondary / tertiary
     dist_m        : pipe length
     slope         : slope
     cost          : candidate cost if available
@@ -2579,7 +2582,7 @@ def export_pipes_to_shapefile_2(
     df = pd.DataFrame(all_records)
     gdf = gpd.GeoDataFrame(df, geometry="geometry", crs=crs)
 
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
     save_vector(gdf, output_path)
 
     print(f"✅ Exported {len(all_records)} pipes to: {output_path}")

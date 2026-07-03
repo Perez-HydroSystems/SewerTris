@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sewertris"
-version = "0.1.0"
+version = "1.0.0"
 description = "Synthetic urban sanitary sewer system generator and EPA-SWMM benchmarking framework."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -13,13 +13,35 @@ authors = [
   { name = "Kevin Blanco" },
   { name = "Gabriel Perez" }
 ]
+keywords = [
+  "sanitary sewer",
+  "inflow and infiltration",
+  "I&I",
+  "EPA-SWMM",
+  "PySWMM",
+  "urban hydrology",
+  "synthetic data",
+  "procedural generation",
+  "wastewater infrastructure",
+]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Topic :: Scientific/Engineering :: Hydrology",
+]
 dependencies = [
   "geopandas",
   "matplotlib",
+  "netcdf4",
   "networkx",
   "numpy",
   "osmnx",
   "pandas",
+  "pillow",
   "pyproj",
   "pyswmm",
   "rasterio",
@@ -29,6 +51,9 @@ dependencies = [
   "shapely",
   "xarray"
 ]
+
+[project.urls]
+Repository = "https://github.com/Perez-HydroSystems/sewertris"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -763,7 +763,7 @@ def generate_clustered_rainfall_timeseries(
     # Generate full time index
     time_index = pd.date_range(start=start_date, end=end_date, freq=f"{timestep_minutes}min")
     df = pd.DataFrame(index=time_index)
-    df['date'] = df.index.strftime("%-m/%-d/%Y")  # SWMM-compatible
+    df['date'] = [f"{ts.month}/{ts.day}/{ts.year}" for ts in df.index]  # SWMM-compatible (avoid POSIX-only %-m/%-d)
     df['time'] = df.index.strftime("%H:%M")
     df['month'] = df.index.month
     df['year'] = df.index.year
@@ -963,7 +963,7 @@ def create_vcp_density_raster(
             x_min = transform[2] + j * transform[0]
             y_max = transform[5] + i * transform[4]
             x_max = x_min + resolution
-            y_min = y_max + resolution
+            y_min = y_max - resolution
             
             # Create pixel polygon
             pixel_bbox = box(x_min, y_min, x_max, y_max)
@@ -1134,7 +1134,7 @@ def create_building_density_raster(boundary_path, output_raster, resolution=100.
             x_min = transform[2] + j * transform[0]
             y_max = transform[5] + i * transform[4]
             x_max = x_min + resolution
-            y_min = y_max + resolution
+            y_min = y_max - resolution
 
             pixel_bbox = box(x_min, y_min, x_max, y_max)
 

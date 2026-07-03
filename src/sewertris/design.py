@@ -23,7 +23,8 @@ def british_columbia_peaking_factor(q_lps):
     q_mgd = q_lps * 0.022824
 
     # Apply BC formula and bound the result
-    raw_pf = 1 + 11 / np.sqrt(q_mgd.clip(lower=0.001))
+    # np.clip works for float, ndarray, and pd.Series (q_mgd.clip(lower=...) is pandas-only)
+    raw_pf = 1 + 11 / np.sqrt(np.clip(q_mgd, 0.001, None))
     pf = np.clip(raw_pf, 2.5, 4.0)  # Clamp to [2.5, 4.0]
 
     peak_flow_lps = q_lps * pf

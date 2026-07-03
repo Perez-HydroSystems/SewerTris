@@ -3,7 +3,7 @@ message: "If you use this software, please cite it as below."
 title: "SewerTris: Synthetic urban sanitary sewer system generator and EPA-SWMM benchmarking framework"
 type: software
 version: "1.0.0"
-date-released: 2026-06-01
+date-released: 2026-07-03
 license: MIT
 repository-code: "https://github.com/Perez-HydroSystems/sewertris.git"
 

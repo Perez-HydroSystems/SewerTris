@@ -56,7 +56,8 @@ def find_road_intersections(roads_gdf):
     Find all road intersections to place manholes
     """
     # Convert roads to lines
-    if roads_gdf.geometry.type[0] == 'Polygon' or roads_gdf.geometry.type[0] == 'MultiPolygon':
+    first_geom_type = roads_gdf.geometry.geom_type.iloc[0]
+    if first_geom_type == 'Polygon' or first_geom_type == 'MultiPolygon':
         # Extract all exterior boundaries
         boundaries = []
         for geom in roads_gdf.geometry:
@@ -147,9 +148,11 @@ def generate_base_topography(boundary_gdf, roads_gdf, intersections, outlet_poin
     width = int(round((x_max - x_min) / config.cell_size))
     height = int(round((y_max - y_min) / config.cell_size))
     
-    # Create grid points - note the ordering of y coordinates
-    x = np.linspace(x_min, x_max, width)
-    y = np.linspace(y_max, y_min, height)  # Reversed y-coordinates for GeoTIFF compatibility
+    # Create grid points at cell centers so spacing is exactly cell_size and
+    # matches the from_bounds georeferencing (which treats these as cell edges).
+    # Note the ordering of y coordinates (top-to-bottom for GeoTIFF compatibility).
+    x = x_min + (np.arange(width) + 0.5) * config.cell_size
+    y = y_max - (np.arange(height) + 0.5) * config.cell_size
     xx, yy = np.meshgrid(x, y)
     
     print(f"Grid shape: {xx.shape}")
@@ -1589,7 +1592,7 @@ def update_manhole_elevations_from_dem(
     # 1) Read DEM
     with rasterio.open(dem_path) as src:
         dem = src.read(1)
-        tf: Affine = src.transform
+        tf = src.transform
         crs_dem = src.crs
         nodata = src.nodata
         height, width = dem.shape

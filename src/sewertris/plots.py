@@ -721,7 +721,7 @@ def generate_clustered_rainfall_timeseries(
     # Generate full time index
     time_index = pd.date_range(start=start_date, end=end_date, freq=f"{timestep_minutes}min")
     df = pd.DataFrame(index=time_index)
-    df['date'] = df.index.strftime("%-m/%-d/%Y")  # SWMM-compatible
+    df['date'] = [f"{ts.month}/{ts.day}/{ts.year}" for ts in df.index]  # SWMM-compatible (avoid POSIX-only %-m/%-d)
     df['time'] = df.index.strftime("%H:%M")
     df['month'] = df.index.month
     df['year'] = df.index.year

@@ -515,7 +515,7 @@ class SewerTrisScenario:
 class SewerTrisProject:
     """Manage a reproducible SewerTris project and its SWMM scenarios.
 
-    The procedural ``sp.function(...)`` API remains the source of truth. This
+    The procedural ``st.function(...)`` API remains the source of truth. This
     class manages standard output paths, JSON metadata, repeated runs, and
     common workflow methods for notebooks and batch experiments.
     """

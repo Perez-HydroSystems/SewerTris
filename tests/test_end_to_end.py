@@ -4,7 +4,7 @@ Runs all 12 steps (domain -> ... -> flow decomposition) on a small domain via
 the shared session-scoped fixture chain, including a real EPA-SWMM simulation,
 and asserts that every stage produced its artifact and the final outlet flow
 decomposes into physically-sane components. Mirrors
-``tests/Comp_time_Test.ipynb`` as an automated regression guard.
+``tests/SewerTris_Test_Suite.ipynb`` as an automated regression guard.
 
 Marked ``slow`` (requires pyswmm); skip with ``pytest -m "not slow"``.
 """

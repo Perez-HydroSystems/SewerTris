@@ -133,7 +133,11 @@ def export_individual_figures_to_shapefile(
     - output_path (str): File path for the output shapefile
     - id_to_type_map (dict or None): Optional. Maps each shape ID to a tetromino letter or "block"
     - crs (str): Coordinate Reference System (default EPSG:3857)
-    - flip_y (bool): If True, invert the Y-axis (North/South flip)
+    - flip_y (bool): Controls vertical orientation of the exported polygons.
+        If False (default), row 0 of ``filled_board`` is placed at the top
+        (largest Y), preserving the array/image orientation. If True, the row
+        index maps directly to Y, so row 0 is at the bottom (smallest Y),
+        matching a north-up geographic orientation.
     """
     import geopandas as gpd
     import numpy as np

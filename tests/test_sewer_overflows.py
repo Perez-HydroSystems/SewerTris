@@ -15,6 +15,12 @@ import pytest
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _MODULE_PATH = _REPO_ROOT / "New_Development" / "sewer_overflows.py"
 
+if not _MODULE_PATH.exists():
+    pytest.skip(
+        "New_Development/sewer_overflows.py is not shipped in this release",
+        allow_module_level=True,
+    )
+
 _spec = importlib.util.spec_from_file_location("sewer_overflows", _MODULE_PATH)
 sewer_overflows = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(sewer_overflows)
