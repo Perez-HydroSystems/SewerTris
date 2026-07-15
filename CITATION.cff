@@ -12,10 +12,12 @@ authors:
   - family-names: Blanco
     given-names: Kevin
     affiliation: "School of Civil and Environmental Engineering, Oklahoma State University"
+    orcid: "https://orcid.org/0009-0003-1884-2740"
   - family-names: Perez
     given-names: Gabriel
     affiliation: "School of Civil and Environmental Engineering, Oklahoma State University"
     website: "https://experts.okstate.edu/gabriel.perez_mesa"
+    orcid: "https://orcid.org/0000-0003-3880-0874"
 
 keywords:
   - sanitary sewer

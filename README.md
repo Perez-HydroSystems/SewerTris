@@ -211,8 +211,10 @@ You are free to use, modify, and distribute this software with attribution.
 - Kevin Blanco
 PhD Student — Civil & Environmental Engineering
 Oklahoma State University
+ORCID: [0009-0003-1884-2740](https://orcid.org/0009-0003-1884-2740)
 - Dr. Gabriel Pérez
 Professor — Civil & Environmental Engineering
 Oklahoma State University
+ORCID: [0000-0003-3880-0874](https://orcid.org/0000-0003-3880-0874)
 https://experts.okstate.edu/gabriel.perez_mesa
 
